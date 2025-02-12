@@ -1,0 +1,17 @@
+filter(.outcome.bookOdds.PRIZEPICKS.odds <= -119)
+| filter(.outcome.bookOdds.PRIZEPICKS.odds >= -120)
+| filter(.outcome.periodLabel == "2H")
+| filter(.stats.h2h >= 0.60)
+| filter(.stats.l10>= 0.6)
+| filter(.stats.l5 >= 0.60)
+| filter(.stats.curSeason >= 0.60)
+| sort(.stats.curSeason, "desc")
+| map({
+    player: .outcome.marketLabel,
+    line: .outcome.line,
+    type: .outcome.outcomeLabel,
+    h2h: .stats.h2h,
+    l10: .stats.l10,
+    l5: .stats.l5,
+    curSeason: .stats.curSeason
+  })
