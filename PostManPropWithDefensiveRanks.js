@@ -92,7 +92,11 @@ function getOpponentDefenseRanking(playerTeamId, eventId, propType) {
         return "N/A";
     }
 
-    const defenseStats = team?.rankings?.statRankings?.overall?.defense || [];
+    //const defenseStats = team?.rankings?.statRankings?.overall?.defense || [];
+    const defenseStats = (propType === "STEALS" || propType === "STEALS_BLOCKS" || propType === "BLOCKS") 
+        ? team?.rankings?.statRankings?.overall?.offense
+        : team?.rankings?.statRankings?.overall?.defense 
+        || [];
 
     // Define stat mappings
     const statMap = {
@@ -113,7 +117,8 @@ function getOpponentDefenseRanking(playerTeamId, eventId, propType) {
         "THREE_POINTERS_ATTEMPTED": "threePointsAtt",
         "FIELD_GOALS_ATTEMPTED": "twoPointsAtt",
         "DEFENSIVE_REBOUNDS": "defRebounds",
-        "OFFENSIVE_REBOUNDS": "offRebounds"
+        "OFFENSIVE_REBOUNDS": "offRebounds",
+        "MADE_FIELD_GOALS": "fieldGoalPct"
     };
 
     // If the propType is FANTASY_SCORE_PP, calculate the average rank of "points|rebounds|assists" and "steals|blocks"
@@ -145,12 +150,6 @@ function filterProps(item, filterType) {
     // let isUnderDog = books.includes("UNDERDOG");
     // let marketLabel = item.outcome.marketLabel;
     // let prop = item.outcome.proposition;
-    let hasValidOdds =
-        item.outcome.bookOdds?.CAESARS?.odds !== undefined ||
-        item.outcome.bookOdds?.FANDUEL?.odds !== undefined ||
-        item.outcome.bookOdds?.DRAFTKINGS?.odds !== undefined ||
-        item.outcome.bookOdds?.BET365?.odds !== undefined ||
-        item.outcome.bookOdds?.BETMGM?.odds !== undefined;
 
     // Check if any sportsbook has odds <= -125
     let hasFavorableOdds = [
@@ -161,12 +160,11 @@ function filterProps(item, filterType) {
         item.outcome.bookOdds?.BETMGM?.odds
     ].some(odds => odds !== undefined && parseFloat(odds) <= -130);
 
-    let strongTrendPicks = stats.h2h >= 0.75
+    let strongTrendPicks = stats.h2h >= 0.5
         && stats.l10 >= 0.6
-        && stats.l5 >= stats.l10 * .85
-        // && hasValidOdds
+        && stats.l5 >= stats.l10 >= stats.l10
         // && hasFavorableOdds
-        // && stats.curSeason <= 0.7
+        && stats.curSeason <= 0.65
         && stats.curSeason >= 0.56
 
     let goblinPicks = stats.h2h >= 0.8
@@ -261,7 +259,7 @@ function mapProps(item, filterType) {
             defenseClass = "dark-green-text";  // Heavy Favorable matchup
         } else if ((isOver && opponentDefenseRank <= 10) || (!isOver && opponentDefenseRank >= 20)) {
             defenseClass = "dark-red-text";  // Heavy Unfavorable matchup
-            // return null;
+            return null;
         } else if ((!isOver && opponentDefenseRank <= 15) || (isOver && opponentDefenseRank >= 15)) {
             defenseClass = "green-text";  // Medium favorable matchup
         } else if ((isOver && opponentDefenseRank <= 15) || (!isOver && opponentDefenseRank >= 15)) {
@@ -322,6 +320,6 @@ pm.visualizer.set(
     template, 
     constructVisualizerPayload(
         FilterType.HIGH_PRIZEPICKS_ODDS_PROPS,  
-        SortingType.TREND_FIRST
+        SortingType.DEFENSE_RANK_FIRST
     )
 );
