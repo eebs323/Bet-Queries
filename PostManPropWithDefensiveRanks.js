@@ -76,15 +76,6 @@ function findOpponentTeam(playerTeamId, eventId) {
     return playerTeamId == game.home.teamId ? game.away.teamId : game.home.teamId;
 }
 
-// Function to get a team's defensive rankings
-function getTeamDefenseRankings(teamId) {
-    const currentSeason = defensiveStats.content?.seasons?.find(season => season.year == '2024');
-    if (!currentSeason) return null;
-
-    const team = currentSeason.teams?.find(team => team.teamId == teamId);
-    return team?.rankings?.statRankings?.overall?.defense || [];
-}
-
 function getOpponentDefenseRanking(playerTeamId, eventId, propType) {
     let opponentTeamId = findOpponentTeam(playerTeamId, eventId);
     if (!opponentTeamId) return "N/A";
@@ -144,19 +135,16 @@ function getOpponentDefenseRanking(playerTeamId, eventId, propType) {
     return ranking !== undefined ? ranking : "N/A";
 }
 
-
-
 function filterProps(item, filterType) {
-    let ppOdds = item.outcome.bookOdds.PRIZEPICKS?.odds;
+    let ppOdds =  parseFloat(item.outcome.bookOdds.PRIZEPICKS?.odds);
     let bestOdds = parseFloat(item.outcome.bestOdds) || 0;
     let stats = item.stats;
-    let books = item.outcome.books || [];
     let outcomeLabel = item.outcome.outcomeLabel;
-    let isPrizePicks = books.includes("PRIZEPICKS");
-    let isUnderDog = books.includes("UNDERDOG");
-    let marketLabel = item.outcome.marketLabel;
-    let prop = item.outcome.proposition;
-
+    // let books = item.outcome.books || [];
+    // let isPrizePicks = books.includes("PRIZEPICKS");
+    // let isUnderDog = books.includes("UNDERDOG");
+    // let marketLabel = item.outcome.marketLabel;
+    // let prop = item.outcome.proposition;
     let hasValidOdds =
         item.outcome.bookOdds?.CAESARS?.odds !== undefined ||
         item.outcome.bookOdds?.FANDUEL?.odds !== undefined ||
@@ -164,32 +152,38 @@ function filterProps(item, filterType) {
         item.outcome.bookOdds?.BET365?.odds !== undefined ||
         item.outcome.bookOdds?.BETMGM?.odds !== undefined;
 
-    let strongTrendPicks = stats.h2h >= 0.5
-        && stats.l10 >= 0.5
-        && stats.l5 >= stats.l10
-        && stats.l5 >= 0.8
-        && stats.curSeason <= 0.7
-        && stats.curSeason >= 0.52
+    // Check if any sportsbook has odds <= -125
+    let hasFavorableOdds = [
+        item.outcome.bookOdds?.CAESARS?.odds,
+        item.outcome.bookOdds?.FANDUEL?.odds,
+        item.outcome.bookOdds?.DRAFTKINGS?.odds,
+        item.outcome.bookOdds?.BET365?.odds,
+        item.outcome.bookOdds?.BETMGM?.odds
+    ].some(odds => odds !== undefined && parseFloat(odds) <= -130);
 
-    let goblinPicks = stats.h2h >= 0.5
-        && stats.l10 >= 0.5
-        && stats.l5 >= stats.l10
-        && stats.l5 >= 0.8
-        && stats.curSeason >= 0.52
+    let strongTrendPicks = stats.h2h >= 0.75
+        && stats.l10 >= 0.6
+        && stats.l5 >= stats.l10 * .85
+        // && hasValidOdds
+        // && hasFavorableOdds
+        // && stats.curSeason <= 0.7
+        && stats.curSeason >= 0.56
+
+    let goblinPicks = stats.h2h >= 0.8
+        && stats.l10 >= 0.8
+        && stats.l5 >= stats.l10 *.8
+        && stats.curSeason >= 0.75
         && outcomeLabel == "Over";
 
-    let highOddsProps = bestOdds <= -100;
-    let noGoblinProps = ppOdds !== "-137"
-
-    let highPrizePicksOddsWithoutGoblinProps = isPrizePicks && highOddsProps & strongTrendPicks && noGoblinProps;
-    let chalkboardProps = strongTrendPicks && highOddsProps && bestOdds >= -400;
+    let noGoblinProps = ppOdds !== -137
+    let chalkboardProps = strongTrendPicks && bestOdds >= -400;
     
     // return marketLabel.includes("Bruce Brown")  && noGoblinProps;
     switch (filterType) {
         case FilterType.GOBLIN_PROPS:
             return goblinPicks;
         case FilterType.HIGH_PRIZEPICKS_ODDS_PROPS:
-            return highPrizePicksOddsWithoutGoblinProps; //&& outcomeLabel == "Over";
+            return strongTrendPicks && noGoblinProps;
         case FilterType.CHALKBOARD_PROPS:
             return chalkboardProps;
         default:
@@ -204,6 +198,10 @@ function sortProps(a, b, sortingType) {
     let seasonB = parseFloat(b.stats.curSeason) || 0;
     let defenseRankA = parseFloat(getOpponentDefenseRanking(a.outcome.teamId, a.outcome.eventId, a.outcome.proposition)) || 30; // Default to worst rank
     let defenseRankB = parseFloat(getOpponentDefenseRanking(b.outcome.teamId, b.outcome.eventId, b.outcome.proposition)) || 30;
+    let l10A = parseFloat(a.stats.l10) || 0;
+    let l10B = parseFloat(b.stats.l10) || 0;
+    let l5A = parseFloat(a.stats.l5) || 0;
+    let l5B = parseFloat(b.stats.l5) || 0;
 
     if (sortingType === SortingType.DEFENSE_RANK_FIRST) {
         if (defenseRankA !== defenseRankB) return  defenseRankB - defenseRankA; // Lower rank = better defense (higher priority)
@@ -221,10 +219,17 @@ function sortProps(a, b, sortingType) {
         return seasonB - seasonA;
     }
 
+    if (sortingType === SortingType.TREND_FIRST) {
+        let trendA = l10A + l5A;
+        let trendB = l10B + l5B;
+        if (trendB !== trendA) return trendB - trendA;
+        return seasonB - seasonA;
+    }
+
     return 0; // Default case (no sorting)
 }
 
-function mapProps(item, index, array) {
+function mapProps(item, filterType) {
     let isPrizePicks = item.outcome.bookOdds.PRIZEPICKS !== undefined;
     let includeItem = isPrizePicks;
 
@@ -244,7 +249,7 @@ function mapProps(item, index, array) {
     
     // **🚨 Filter out props with "N/A" defense ranking or "Unknown Team" opponent 🚨**
     if (opponentDefenseRank == "N/A" && opponentTeamName == "Unknown Team") {
-        return null;
+        // return null;
     }
 
     let isOver = item.outcome.outcomeLabel === "Over";
@@ -287,18 +292,6 @@ function mapProps(item, index, array) {
         : null;
 }
 
-const SortingType = {
-    CUR_SEASON_FIRST: "CurSeasonFirst",  // Sort by curSeason → bestOdds
-    BEST_ODDS_FIRST: "BestOddsFirst",    // Sort by bestOdds → curSeason
-    DEFENSE_RANK_FIRST: "DefenseRankFirst" // Sort by opponent defense ranking (Ascending: Easier Matchups First)
-};
-
-const FilterType = {
-    GOBLIN_PROPS: "GoblinProps",
-    HIGH_PRIZEPICKS_ODDS_PROPS: "highPrizePicksOddsWithoutGoblinProps", // NEW: Combines PrizePicks, High Odds, and Strong Props
-    CHALKBOARD_PROPS: "ChalkboardProps" // NEW: Strong Picks + High Odds + Best Odds >= -400
-};
-
 function constructVisualizerPayload(filterType, sortingType) {
     var responseData = pm.response.json();
     if (filterType === FilterType.GOBLIN_PROPS) {
@@ -307,16 +300,28 @@ function constructVisualizerPayload(filterType, sortingType) {
     var filteredData = responseData.props
         .filter(item => filterProps(item, filterType))
         .sort((a, b) => sortProps(a, b, sortingType))
-        .map(mapProps)
+        .map(mapProps, filterType)
         .filter(item => item !== null); // Remove null values
     return { filteredData };
 }
 
+const SortingType = {
+    CUR_SEASON_FIRST: "CurSeasonFirst",  // Sort by curSeason → bestOdds
+    BEST_ODDS_FIRST: "BestOddsFirst",    // Sort by bestOdds → curSeason
+    DEFENSE_RANK_FIRST: "DefenseRankFirst", // Sort by opponent defense ranking (Ascending: Easier Matchups First)
+    TREND_FIRST: "TrendFirst"
+};
+
+const FilterType = {
+    GOBLIN_PROPS: "GoblinProps",
+    HIGH_PRIZEPICKS_ODDS_PROPS: "highPrizePicksOddsWithoutGoblinProps", // NEW: Combines PrizePicks, High Odds, and Strong Props
+    CHALKBOARD_PROPS: "ChalkboardProps" // NEW: Strong Picks + High Odds + Best Odds >= -400
+};
 
 pm.visualizer.set(
     template, 
     constructVisualizerPayload(
         FilterType.HIGH_PRIZEPICKS_ODDS_PROPS,  
-        SortingType.CUR_SEASON_FIRST
+        SortingType.TREND_FIRST
     )
 );
