@@ -288,12 +288,15 @@ function constructVisualizerPayload(filterType, sortingType) {
 function filterProps(item, filterType) {
     // return marketLabel.includes("Bruce Brown")  && noGoblinProps;
     let isOver = item.outcome.outcomeLabel === "Over";
-    if (!isOver) return null;
-    
+    // if (!isOver) return null;
+
     let stats = item.stats;
     let lowTrendProps = stats.l10 <= 0.4 && stats.l5 <= 0.4
-    let inflatedProps = stats.l10 >= 0.8 && stats.l5 >= 0.8
-    if (lowTrendProps || inflatedProps) {
+    let inflatedProps = stats.l10 >= 0.8 && stats.l5 >= 0.8 && !isOver
+    if (
+        lowTrendProps 
+    || inflatedProps
+    ) {
         return false;
     }
     
@@ -301,7 +304,7 @@ function filterProps(item, filterType) {
     let outcomeLabel = item.outcome.outcomeLabel;
     let noGoblinProps = ppOdds !== -137
     let averageOdds = getAvgOdds(item)
-    let hasFavorableOdds = averageOdds !== null && averageOdds <= -119;
+    let hasFavorableOdds = averageOdds !== null && averageOdds <= -125;
 
     let goblinOdds = averageOdds !== null && averageOdds <= -400
     let goblinPicks = true 
@@ -313,7 +316,7 @@ function filterProps(item, filterType) {
     
     let highTrendPicks = noGoblinProps
         && stats.h2h >= 0.99
-        && stats.l5 >= stats.l10
+        && stats.l5 > stats.l10
 
     let highOddsProps = highTrendPicks && hasFavorableOdds;
 
@@ -345,7 +348,7 @@ const FilterType = {
 pm.visualizer.set(
     template, 
     constructVisualizerPayload(
-        FilterType.HIGH_ODDS,  
+        FilterType.HIGH_TREND,  
         SortingType.BEST_ODDS_FIRST
     )
 );
