@@ -150,47 +150,6 @@ function getOpponentDefenseRanking(playerTeamId, eventId, propType) {
     return ranking !== undefined ? ranking : "N/A";
 }
 
-function filterProps(item, filterType) {
-    // return marketLabel.includes("Bruce Brown")  && noGoblinProps;
-    let stats = item.stats;
-    let lowTrendProps = stats.l10 <= 0.4 && stats.l5 <= 0.4
-    let inflatedProps = stats.l10 >= 0.8 && stats.l5 >= 0.8
-    if (lowTrendProps || inflatedProps) {
-        return false;
-    }
-    
-    let ppOdds =  parseFloat(item.outcome.bookOdds.PRIZEPICKS?.odds);
-    let outcomeLabel = item.outcome.outcomeLabel;
-    let noGoblinProps = ppOdds !== -137
-    let averageOdds = getAvgOdds(item)
-    let hasFavorableOdds = averageOdds !== null && averageOdds <= -119;
-
-    let goblinOdds = averageOdds !== null && averageOdds <= -400
-    let goblinPicks = true 
-        && stats.h2h >= 0.75
-        && stats.l10 >= 0.7
-        && stats.l5 >= stats.l10
-        && stats.curSeason >= 0.75
-        && outcomeLabel == "Over";
-    
-    let highTrendPicks = noGoblinProps
-        && stats.h2h >= 0.99
-        && stats.l5 >= stats.l10
-
-    let highOddsProps = highTrendPicks && hasFavorableOdds;
-
-    switch (filterType) {
-        case FilterType.GOBLIN_PROPS:
-            return  goblinPicks || goblinOdds;
-        case FilterType.HIGH_TREND:
-            return highTrendPicks;
-        case FilterType.HIGH_ODDS:
-            return highOddsProps;
-        default:
-            return false;
-    }
-}
-
 function sortProps(a, b, sortingType) {
     let bestOddsA = getAvgOdds(a) || 0;
     let bestOddsB = getAvgOdds(b) || 0;
@@ -249,12 +208,10 @@ function mapProps(item, filterType) {
     
     // **🚨 Filter out props with "N/A" defense ranking or "Unknown Team" opponent 🚨**
     if (opponentDefenseRank == "N/A" && opponentTeamName == "Unknown Team") {
-        return null;
+        // return null;
     }
 
     let isOver = item.outcome.outcomeLabel === "Over";
-    // if (!isOver) return null;
-
     let defenseClass = "";
     if (opponentDefenseRank !== "N/A") {
         if ((isOver && opponentDefenseRank >= 20) || (!isOver && opponentDefenseRank <= 10)) {
@@ -325,6 +282,51 @@ function constructVisualizerPayload(filterType, sortingType) {
         .map(mapProps, filterType)
         .filter(item => item !== null); // Remove null values
     return { filteredData };
+}
+
+
+function filterProps(item, filterType) {
+    // return marketLabel.includes("Bruce Brown")  && noGoblinProps;
+    let isOver = item.outcome.outcomeLabel === "Over";
+    if (!isOver) return null;
+    
+    let stats = item.stats;
+    let lowTrendProps = stats.l10 <= 0.4 && stats.l5 <= 0.4
+    let inflatedProps = stats.l10 >= 0.8 && stats.l5 >= 0.8
+    if (lowTrendProps || inflatedProps) {
+        return false;
+    }
+    
+    let ppOdds =  parseFloat(item.outcome.bookOdds.PRIZEPICKS?.odds);
+    let outcomeLabel = item.outcome.outcomeLabel;
+    let noGoblinProps = ppOdds !== -137
+    let averageOdds = getAvgOdds(item)
+    let hasFavorableOdds = averageOdds !== null && averageOdds <= -119;
+
+    let goblinOdds = averageOdds !== null && averageOdds <= -400
+    let goblinPicks = true 
+        && stats.h2h >= 0.75
+        && stats.l10 >= 0.7
+        && stats.l5 >= stats.l10
+        && stats.curSeason >= 0.75
+        && outcomeLabel == "Over";
+    
+    let highTrendPicks = noGoblinProps
+        && stats.h2h >= 0.99
+        && stats.l5 >= stats.l10
+
+    let highOddsProps = highTrendPicks && hasFavorableOdds;
+
+    switch (filterType) {
+        case FilterType.GOBLIN_PROPS:
+            return  goblinPicks || goblinOdds;
+        case FilterType.HIGH_TREND:
+            return highTrendPicks;
+        case FilterType.HIGH_ODDS:
+            return highOddsProps;
+        default:
+            return false;
+    }
 }
 
 const SortingType = {
