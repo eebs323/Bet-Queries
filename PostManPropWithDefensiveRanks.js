@@ -173,7 +173,7 @@ function sortProps(a, b, sortingType) {
         return bestOddsA - bestOddsB;
     } 
 
-    if (sortingType === SortingType.BEST_ODDS_FIRST) {
+    if (sortingType === SortingType.SORT_ODDS_FIRST) {
         if (bestOddsA !== bestOddsB) return bestOddsA - bestOddsB;
         return seasonB - seasonA;
     }
@@ -221,10 +221,10 @@ function mapProps(item, filterType) {
             return null;
         } else if ((!isOver && opponentDefenseRank <= 15) || (isOver && opponentDefenseRank >= 15)) {
             defenseClass = "green-text";  // Medium favorable matchup
-            //return null;
+            // return null;
         } else if ((isOver && opponentDefenseRank <= 15) || (!isOver && opponentDefenseRank >= 15)) {
             defenseClass = "red-text";  // Medium unfavorable matchup
-            //return null;
+            // return null;
         }
     }
 
@@ -259,7 +259,7 @@ function getAvgOdds(item) {
         item.outcome.bookOdds?.DRAFTKINGS?.odds,
         item.outcome.bookOdds?.BET365?.odds,
         item.outcome.bookOdds?.BETMGM?.odds,
-        item.outcome.bookOdds?.PRIZEPICKS?.odds,
+        // item.outcome.bookOdds?.PRIZEPICKS?.odds,
         item.outcome.bookOdds?.UNDERDOG?.odds,
         item.outcome.bookOdds?.SLEEPER?.odds,
     ].map(odds => parseFloat(odds)).filter(odds => !isNaN(odds)); // Convert to numbers & remove NaN values
@@ -273,9 +273,9 @@ function getAvgOdds(item) {
 
 function constructVisualizerPayload(filterType, sortingType) {
     var responseData = pm.response.json();
-    if (filterType === FilterType.GOBLIN_PROPS) {
-        sortingType = SortingType.CUR_SEASON_FIRST;
-    }
+    // if (filterType === FilterType.FILTER_GOBLINS) {
+    //     sortingType = SortingType.CUR_SEASON_FIRST;
+    // }
     var filteredData = responseData.props
         .filter(item => filterProps(item, filterType))
         .sort((a, b) => sortProps(a, b, sortingType))
@@ -288,7 +288,7 @@ function constructVisualizerPayload(filterType, sortingType) {
 function filterProps(item, filterType) {
     // return marketLabel.includes("Bruce Brown")  && noGoblinProps;
     let isOver = item.outcome.outcomeLabel === "Over";
-    // if (!isOver) return null;
+    if (!isOver) return null;
 
     let stats = item.stats;
     let lowTrendProps = stats.l10 <= 0.4 && stats.l5 <= 0.4
@@ -315,18 +315,18 @@ function filterProps(item, filterType) {
         && outcomeLabel == "Over";
     
     let highTrendPicks = noGoblinProps
-        && stats.h2h >= 0.99
+        && stats.h2h >= 0.75
         && stats.l5 > stats.l10
 
-    let highOddsProps = highTrendPicks && hasFavorableOdds;
+    let highTrendOddsProps = highTrendPicks && hasFavorableOdds;
 
     switch (filterType) {
-        case FilterType.GOBLIN_PROPS:
+        case FilterType.FILTER_GOBLINS:
             return  goblinPicks || goblinOdds;
-        case FilterType.HIGH_TREND:
-            return highTrendPicks;
-        case FilterType.HIGH_ODDS:
-            return highOddsProps;
+        case FilterType.FILTER_HIGH_TREND:
+            return highTrendOddsProps;
+        case FilterType.FILTER_HIGH_ODDS:
+            return hasFavorableOdds && noGoblinProps;
         default:
             return false;
     }
@@ -334,21 +334,21 @@ function filterProps(item, filterType) {
 
 const SortingType = {
     CUR_SEASON_FIRST: "CurSeasonFirst",  // Sort by curSeason → bestOdds
-    BEST_ODDS_FIRST: "BestOddsFirst",    // Sort by bestOdds → curSeason
+    SORT_ODDS_FIRST: "BestOddsFirst",    // Sort by bestOdds → curSeason
     DEFENSE_RANK_FIRST: "DefenseRankFirst", // Sort by opponent defense ranking (Ascending: Easier Matchups First)
     TREND_FIRST: "TrendFirst"
 };
 
 const FilterType = {
-    GOBLIN_PROPS: "GoblinProps",
-    HIGH_ODDS: "highPrizePicksOddsWithoutGoblinProps", // NEW: Combines PrizePicks, High Odds, and Strong Props
-    HIGH_TREND: "HIGH_TREND"
+    FILTER_GOBLINS: "FILTER_GOBLINS",
+    FILTER_HIGH_ODDS: "FILTER_HIGH_ODDS", // NEW: Combines PrizePicks, High Odds, and Strong Props
+    FILTER_HIGH_TREND: "FILTER_HIGH_TREND"
 };
 
 pm.visualizer.set(
     template, 
     constructVisualizerPayload(
-        FilterType.HIGH_TREND,  
-        SortingType.BEST_ODDS_FIRST
+        FilterType.FILTER_HIGH_ODDS,  
+        SortingType.SORT_ODDS_FIRST
     )
 );
