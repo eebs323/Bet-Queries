@@ -30,7 +30,9 @@ var template = `
                 <th>H2H</th>
                 <th>Szn</th>
                 <th>D Rank</th>
+                <th>ODDS</th>
                 <th>PP</th>
+                <th>SL</th>
                 <th>UD</th>
                 <th>FD</th>
                 <th>DK</th>
@@ -50,7 +52,9 @@ var template = `
                 <td>{{h2h}}</td>
                 <td>{{curSeason}}</td>
                 <td class="{{defenseClass}}">{{defenseRank}}</td>
+                <td>{{AVG_ODDS}}</td>
                 <td>{{PP_odds}}</td>
+                <td>{{SleeperOdds}}</td>
                 <td>{{UD_odds}}</td>
                 <td>{{FANDUEL_odds}}</td>
                 <td>{{DK_odds}}</td>
@@ -93,7 +97,13 @@ function getOpponentDefenseRanking(playerTeamId, eventId, propType) {
     }
 
     //const defenseStats = team?.rankings?.statRankings?.overall?.defense || [];
-    const defenseStats = (propType === "STEALS" || propType === "STEALS_BLOCKS" || propType === "BLOCKS") 
+    const defenseStats = (
+        propType === "STEALS" 
+        || propType === "STEALS_BLOCKS" 
+        || propType === "BLOCKS"
+        || propType === "DEFENSIVE_REBOUNDS"
+        || propType === "TURNOVERS"
+    ) 
         ? team?.rankings?.statRankings?.overall?.offense
         : team?.rankings?.statRankings?.overall?.defense 
         || [];
@@ -113,7 +123,7 @@ function getOpponentDefenseRanking(playerTeamId, eventId, propType) {
         "STEALS_BLOCKS": "steals|blocks",
         "TURNOVERS": "turnovers",
         "THREE_POINTERS": "threePointPct",
-        "FREE_THROWS": "freeThrowPct",
+        "FREE_THROWS": "ftMade",
         "THREE_POINTERS_ATTEMPTED": "threePointsAtt",
         "FIELD_GOALS_ATTEMPTED": "twoPointsAtt",
         "DEFENSIVE_REBOUNDS": "defRebounds",
@@ -141,57 +151,49 @@ function getOpponentDefenseRanking(playerTeamId, eventId, propType) {
 }
 
 function filterProps(item, filterType) {
-    let ppOdds =  parseFloat(item.outcome.bookOdds.PRIZEPICKS?.odds);
-    let bestOdds = parseFloat(item.outcome.bestOdds) || 0;
+    // return marketLabel.includes("Bruce Brown")  && noGoblinProps;
     let stats = item.stats;
+    let lowTrendProps = stats.l10 <= 0.4 && stats.l5 <= 0.4
+    let inflatedProps = stats.l10 >= 0.8 && stats.l5 >= 0.8
+    if (lowTrendProps || inflatedProps) {
+        return false;
+    }
+    
+    let ppOdds =  parseFloat(item.outcome.bookOdds.PRIZEPICKS?.odds);
     let outcomeLabel = item.outcome.outcomeLabel;
-    // let books = item.outcome.books || [];
-    // let isPrizePicks = books.includes("PRIZEPICKS");
-    // let isUnderDog = books.includes("UNDERDOG");
-    // let marketLabel = item.outcome.marketLabel;
-    // let prop = item.outcome.proposition;
+    let noGoblinProps = ppOdds !== -137
+    let averageOdds = getAvgOdds(item)
+    let hasFavorableOdds = averageOdds !== null && averageOdds <= -119;
 
-    // Check if any sportsbook has odds <= -125
-    let hasFavorableOdds = [
-        item.outcome.bookOdds?.CAESARS?.odds,
-        item.outcome.bookOdds?.FANDUEL?.odds,
-        item.outcome.bookOdds?.DRAFTKINGS?.odds,
-        item.outcome.bookOdds?.BET365?.odds,
-        item.outcome.bookOdds?.BETMGM?.odds
-    ].some(odds => odds !== undefined && parseFloat(odds) <= -130);
-
-    let strongTrendPicks = stats.h2h >= 0.5
-        && stats.l10 >= 0.6
-        && stats.l5 >= stats.l10 >= stats.l10
-        // && hasFavorableOdds
-        && stats.curSeason <= 0.65
-        && stats.curSeason >= 0.56
-
-    let goblinPicks = stats.h2h >= 0.8
-        && stats.l10 >= 0.8
-        && stats.l5 >= stats.l10 *.8
+    let goblinOdds = averageOdds !== null && averageOdds <= -400
+    let goblinPicks = true 
+        && stats.h2h >= 0.75
+        && stats.l10 >= 0.7
+        && stats.l5 >= stats.l10
         && stats.curSeason >= 0.75
         && outcomeLabel == "Over";
-
-    let noGoblinProps = ppOdds !== -137
-    let chalkboardProps = strongTrendPicks && bestOdds >= -400;
     
-    // return marketLabel.includes("Bruce Brown")  && noGoblinProps;
+    let highTrendPicks = noGoblinProps
+        && stats.h2h >= 0.99
+        && stats.l5 >= stats.l10
+
+    let highOddsProps = highTrendPicks && hasFavorableOdds;
+
     switch (filterType) {
         case FilterType.GOBLIN_PROPS:
-            return goblinPicks;
-        case FilterType.HIGH_PRIZEPICKS_ODDS_PROPS:
-            return strongTrendPicks && noGoblinProps;
-        case FilterType.CHALKBOARD_PROPS:
-            return chalkboardProps;
+            return  goblinPicks || goblinOdds;
+        case FilterType.HIGH_TREND:
+            return highTrendPicks;
+        case FilterType.HIGH_ODDS:
+            return highOddsProps;
         default:
             return false;
     }
 }
 
 function sortProps(a, b, sortingType) {
-    let bestOddsA = parseFloat(a.outcome.bestOdds) || 0;
-    let bestOddsB = parseFloat(b.outcome.bestOdds) || 0;
+    let bestOddsA = getAvgOdds(a) || 0;
+    let bestOddsB = getAvgOdds(b) || 0;
     let seasonA = parseFloat(a.stats.curSeason) || 0;
     let seasonB = parseFloat(b.stats.curSeason) || 0;
     let defenseRankA = parseFloat(getOpponentDefenseRanking(a.outcome.teamId, a.outcome.eventId, a.outcome.proposition)) || 30; // Default to worst rank
@@ -247,7 +249,7 @@ function mapProps(item, filterType) {
     
     // **🚨 Filter out props with "N/A" defense ranking or "Unknown Team" opponent 🚨**
     if (opponentDefenseRank == "N/A" && opponentTeamName == "Unknown Team") {
-        // return null;
+        return null;
     }
 
     let isOver = item.outcome.outcomeLabel === "Over";
@@ -262,9 +264,10 @@ function mapProps(item, filterType) {
             return null;
         } else if ((!isOver && opponentDefenseRank <= 15) || (isOver && opponentDefenseRank >= 15)) {
             defenseClass = "green-text";  // Medium favorable matchup
+            //return null;
         } else if ((isOver && opponentDefenseRank <= 15) || (!isOver && opponentDefenseRank >= 15)) {
             defenseClass = "red-text";  // Medium unfavorable matchup
-            // return null;
+            //return null;
         }
     }
 
@@ -285,9 +288,30 @@ function mapProps(item, filterType) {
               BET365_odds: item.outcome.bookOdds.BET365?.odds,
               MGM_odds: item.outcome.bookOdds.BETMGM?.odds,
               PP_odds: item.outcome.bookOdds.PRIZEPICKS?.odds,
-              UD_odds: item.outcome.bookOdds.UNDERDOG?.odds
+              UD_odds: item.outcome.bookOdds.UNDERDOG?.odds,
+              SleeperOdds:  item.outcome.bookOdds.SLEEPER?.odds,
+              AVG_ODDS: getAvgOdds(item)
           }
         : null;
+}
+
+function getAvgOdds(item) {
+    let sportsbookOdds = [
+        item.outcome.bookOdds?.CAESARS?.odds,
+        item.outcome.bookOdds?.FANDUEL?.odds,
+        item.outcome.bookOdds?.DRAFTKINGS?.odds,
+        item.outcome.bookOdds?.BET365?.odds,
+        item.outcome.bookOdds?.BETMGM?.odds,
+        item.outcome.bookOdds?.PRIZEPICKS?.odds,
+        item.outcome.bookOdds?.UNDERDOG?.odds,
+        item.outcome.bookOdds?.SLEEPER?.odds,
+    ].map(odds => parseFloat(odds)).filter(odds => !isNaN(odds)); // Convert to numbers & remove NaN values
+
+    let averageOdds = sportsbookOdds.length > 0 
+        ? Math.round(sportsbookOdds.reduce((sum, odds) => sum + odds, 0) / sportsbookOdds.length) 
+        : null;
+    
+    return averageOdds;
 }
 
 function constructVisualizerPayload(filterType, sortingType) {
@@ -312,14 +336,14 @@ const SortingType = {
 
 const FilterType = {
     GOBLIN_PROPS: "GoblinProps",
-    HIGH_PRIZEPICKS_ODDS_PROPS: "highPrizePicksOddsWithoutGoblinProps", // NEW: Combines PrizePicks, High Odds, and Strong Props
-    CHALKBOARD_PROPS: "ChalkboardProps" // NEW: Strong Picks + High Odds + Best Odds >= -400
+    HIGH_ODDS: "highPrizePicksOddsWithoutGoblinProps", // NEW: Combines PrizePicks, High Odds, and Strong Props
+    HIGH_TREND: "HIGH_TREND"
 };
 
 pm.visualizer.set(
     template, 
     constructVisualizerPayload(
-        FilterType.HIGH_PRIZEPICKS_ODDS_PROPS,  
-        SortingType.DEFENSE_RANK_FIRST
+        FilterType.HIGH_ODDS,  
+        SortingType.BEST_ODDS_FIRST
     )
 );
