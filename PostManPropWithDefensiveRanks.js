@@ -259,16 +259,17 @@ function getAvgOdds(item) {
         item.outcome.bookOdds?.DRAFTKINGS?.odds,
         item.outcome.bookOdds?.BET365?.odds,
         item.outcome.bookOdds?.BETMGM?.odds,
-        // item.outcome.bookOdds?.PRIZEPICKS?.odds,
+        item.outcome.bookOdds?.PRIZEPICKS?.odds,
         item.outcome.bookOdds?.UNDERDOG?.odds,
         item.outcome.bookOdds?.SLEEPER?.odds,
     ].map(odds => parseFloat(odds)).filter(odds => !isNaN(odds)); // Convert to numbers & remove NaN values
 
-    let averageOdds = sportsbookOdds.length > 0 
-        ? Math.round(sportsbookOdds.reduce((sum, odds) => sum + odds, 0) / sportsbookOdds.length) 
-        : null;
-    
-    return averageOdds;
+    if (sportsbookOdds.length > 0) {
+       let averageOdds = Math.round(sportsbookOdds.reduce((sum, odds) => sum + odds, 0) / sportsbookOdds.length)
+       return averageOdds
+    } else {
+        return null
+    }
 }
 
 function constructVisualizerPayload(filterType, sortingType) {
@@ -318,13 +319,11 @@ function filterProps(item, filterType) {
         && stats.h2h >= 0.75
         && stats.l5 > stats.l10
 
-    let highTrendOddsProps = highTrendPicks && hasFavorableOdds;
-
     switch (filterType) {
         case FilterType.FILTER_GOBLINS:
             return  goblinPicks || goblinOdds;
         case FilterType.FILTER_HIGH_TREND:
-            return highTrendOddsProps;
+            return highTrendPicks;
         case FilterType.FILTER_HIGH_ODDS:
             return hasFavorableOdds && noGoblinProps;
         default:
@@ -348,7 +347,7 @@ const FilterType = {
 pm.visualizer.set(
     template, 
     constructVisualizerPayload(
-        FilterType.FILTER_HIGH_ODDS,  
+        FilterType.FILTER_HIGH_TREND,  
         SortingType.SORT_ODDS_FIRST
     )
 );
