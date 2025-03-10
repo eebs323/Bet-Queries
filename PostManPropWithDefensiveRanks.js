@@ -1,3 +1,12 @@
+const CompetitionId = {
+    GBR_EPL: "GBR_EPL",             // English Premier League
+    ESP_LA_LIGA: "ESP_LA_LIGA",     // Spanish La Liga
+    GER_BUNDESLIGA: "GER_BUNDESLIGA", // German Bundesliga
+    ITA_SERIE_A: "ITA_SERIE_A",     // Italian Serie A
+    FRA_LIGUE_1: "FRA_LIGUE_1",     // French Ligue 1
+    USA_MLS: "USA_MLS"              // Major League Soccer (MLS)
+};
+
 var template = `
     <style>
         table {
@@ -75,11 +84,12 @@ let scheduleKey = `${leagueType}Schedule`;
 let defensiveStats = JSON.parse(pm.globals.get(defensiveStatsKey) || "{}");
 let entities = JSON.parse(pm.globals.get(entitiesKey) || "{}");
 let schedule = JSON.parse(pm.globals.get(scheduleKey) || "{}");
+let competitionId = pm.environment.get("competitionId")
 
 console.log(`Loaded data for league: ${leagueType}`);
-console.log(`Defensive Stats Key: ${defensiveStatsKey}`);
-console.log(`Entities Key: ${entitiesKey}`);
-console.log(`Schedule Data Key: ${scheduleKey}`);
+console.log(`Defensive Stats Key: ${defensiveStats}`);
+console.log(`Entities Key: ${entities}`);
+console.log(`Schedule Data Key: ${schedule}`);
 
 // Function to find opponent team in a game
 function findOpponentTeam(playerTeamId, eventId) {
@@ -93,29 +103,36 @@ function getOpponentDefenseRanking(playerTeamId, eventId, propType) {
     let opponentTeamId = findOpponentTeam(playerTeamId, eventId);
     if (!opponentTeamId) return "N/A";
 
-    const currentSeason = defensiveStats.content?.seasons?.find(season => season.year == '2024');
-    if (!currentSeason) {
-        console.log(`Error: No currentSeason found for season.year: ${season.year}`);
-        return "N/A";
-    }
+    let defenseStats;
+    if (leagueType === "SOCCER" && competitionId) {
+        const competition = defensiveStats.content?.competitions?.find(comp => comp.competitionId === competitionId);
+        if (!competition) return "N/A";
 
-    const team = currentSeason.teams?.find(team => team.teamId == opponentTeamId);
-    if (!team) {
-        console.log(`Error: No team found for teamId: ${playerTeamId}, eventId: ${eventId}`);
-        return "N/A";
-    }
+        const leagueSeason = competition.seasons?.find(season => season.year == '2024');
+        if (!leagueSeason) return "N/A";
 
-    //const defenseStats = team?.rankings?.statRankings?.overall?.defense || [];
-    const defenseStats = (
-        propType === "STEALS" 
-        || propType === "STEALS_BLOCKS" 
-        || propType === "BLOCKS"
-        || propType === "DEFENSIVE_REBOUNDS"
-        || propType === "TURNOVERS"
-    ) 
-        ? team?.rankings?.statRankings?.overall?.offense
-        : team?.rankings?.statRankings?.overall?.defense 
-        || [];
+        const team = leagueSeason.teams?.find(team => team.teamId === opponentTeamId);
+        if (!team) return "N/A";
+        
+        defenseStats = team?.rankings?.statRankings?.overall?.defense || [];
+    } else {
+        const currentSeason = defensiveStats.content?.seasons?.find(season => season.year == '2024');
+        if (!currentSeason) return "N/A";
+
+        const team = currentSeason.teams?.find(team => team.teamId == opponentTeamId);
+        if (!team) return "N/A";
+
+        defenseStats = (
+            propType === "STEALS" 
+            || propType === "STEALS_BLOCKS" 
+            || propType === "BLOCKS"
+            || propType === "DEFENSIVE_REBOUNDS"
+            || propType === "TURNOVERS"
+        ) 
+            ? team?.rankings?.statRankings?.overall?.offense
+            : team?.rankings?.statRankings?.overall?.defense 
+            || [];
+    }
 
     // Define stat mappings for Basketball & Soccer
     const statMap = {
@@ -132,7 +149,7 @@ function getOpponentDefenseRanking(playerTeamId, eventId, propType) {
         "STEALS": "steals",
         "STEALS_BLOCKS": "steals|blocks",
         "TURNOVERS": "turnovers",
-        "THREE_POINTERS": "threePointPct",
+        "THREE_POINTERS": "threePointsMade",
         "FREE_THROWS": "ftMade",
         "THREE_POINTERS_ATTEMPTED": "threePointsAtt",
         "FIELD_GOALS_ATTEMPTED": "twoPointsAtt",
@@ -291,7 +308,7 @@ function getAvgOdds(item) {
         item.outcome.bookOdds?.DRAFTKINGS?.odds,
         item.outcome.bookOdds?.BET365?.odds,
         item.outcome.bookOdds?.BETMGM?.odds,
-        item.outcome.bookOdds?.PRIZEPICKS?.odds,
+        // item.outcome.bookOdds?.PRIZEPICKS?.odds,
         // item.outcome.bookOdds?.UNDERDOG?.odds,
         // item.outcome.bookOdds?.SLEEPER?.odds,
     ].map(odds => parseFloat(odds)).filter(odds => !isNaN(odds)); // Convert to numbers & remove NaN values
@@ -335,6 +352,7 @@ function filterProps(item, filterType) {
     let ppOdds =  parseFloat(item.outcome.bookOdds.PRIZEPICKS?.odds);
     let outcomeLabel = item.outcome.outcomeLabel;
     let noGoblinProps = ppOdds !== -137
+    if (leagueType == "SOCCER") noGoblinProps = true;
     let averageOdds = getAvgOdds(item)
     let hasFavorableOdds = averageOdds !== null && averageOdds <= -130;
 
