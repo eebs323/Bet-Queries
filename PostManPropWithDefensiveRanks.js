@@ -155,38 +155,40 @@ function sortProps(a, b, sortingType) {
     let bestOddsB = getAvgOdds(b) || 0;
     let seasonA = parseFloat(a.stats.curSeason) || 0;
     let seasonB = parseFloat(b.stats.curSeason) || 0;
-    let defenseRankA = parseFloat(getOpponentDefenseRanking(a.outcome.teamId, a.outcome.eventId, a.outcome.proposition)) || 30; // Default to worst rank
+    let defenseRankA = parseFloat(getOpponentDefenseRanking(a.outcome.teamId, a.outcome.eventId, a.outcome.proposition)) || 30;
     let defenseRankB = parseFloat(getOpponentDefenseRanking(b.outcome.teamId, b.outcome.eventId, b.outcome.proposition)) || 30;
-    let l10A = parseFloat(a.stats.l10) || 0;
-    let l10B = parseFloat(b.stats.l10) || 0;
-    let l5A = parseFloat(a.stats.l5) || 0;
-    let l5B = parseFloat(b.stats.l5) || 0;
+    let trendA = (parseFloat(a.stats.l10) || 0) + (parseFloat(a.stats.l5) || 0);
+    let trendB = (parseFloat(b.stats.l10) || 0) + (parseFloat(b.stats.l5) || 0);
 
-    if (sortingType === SortingType.DEFENSE_RANK_FIRST) {
-        if (defenseRankA !== defenseRankB) return  defenseRankB - defenseRankA; // Lower rank = better defense (higher priority)
-        if (seasonB !== seasonA) return seasonB - seasonA; // If Defense Rank is the same, sort by curSeason (Descending)
-        return bestOddsA - bestOddsB; // If both are the same, sort by bestOdds (Ascending)
+    switch (sortingType) {
+        case SortingType.DEFENSE_RANK_FIRST:
+            return defenseRankA !== defenseRankB ? defenseRankB - defenseRankA
+                : seasonB !== seasonA 
+                    ? seasonB - seasonA
+                    : bestOddsA - bestOddsB;
+
+        case SortingType.CUR_SEASON_FIRST:
+            return seasonB !== seasonA 
+                    ? seasonB - seasonA
+                    : bestOddsA - bestOddsB;
+
+        case SortingType.SORT_ODDS_FIRST:
+            return bestOddsA !== bestOddsB 
+                    ? bestOddsA - bestOddsB
+                    : trendB !== trendA 
+                        ? trendB - trendA
+                        : seasonB - seasonA;
+
+        case SortingType.TREND_FIRST:
+            return trendB !== trendA 
+                    ? trendB - trendA
+                    : seasonB - seasonA;
+
+        default:
+            return 0;
     }
-
-    if (sortingType === SortingType.CUR_SEASON_FIRST) {
-        if (seasonB !== seasonA) return seasonB - seasonA;
-        return bestOddsA - bestOddsB;
-    } 
-
-    if (sortingType === SortingType.SORT_ODDS_FIRST) {
-        if (bestOddsA !== bestOddsB) return bestOddsA - bestOddsB;
-        return seasonB - seasonA;
-    }
-
-    if (sortingType === SortingType.TREND_FIRST) {
-        let trendA = l10A + l5A;
-        let trendB = l10B + l5B;
-        if (trendB !== trendA) return trendB - trendA;
-        return seasonB - seasonA;
-    }
-
-    return 0; // Default case (no sorting)
 }
+
 
 function mapProps(item, filterType) {
     let isPrizePicks = item.outcome.bookOdds.PRIZEPICKS !== undefined;
@@ -213,7 +215,7 @@ function mapProps(item, filterType) {
 
     let isOver = item.outcome.outcomeLabel === "Over";
     let defenseClass = "";
-    if (opponentDefenseRank !== "N/A") {
+    if (opponentDefenseRank !== "N/A" || filterType !== FilterType.GOBLIN_PROPS) {
         if ((isOver && opponentDefenseRank >= 20) || (!isOver && opponentDefenseRank <= 10)) {
             defenseClass = "dark-green-text";  // Heavy Favorable matchup
         } else if ((isOver && opponentDefenseRank <= 10) || (!isOver && opponentDefenseRank >= 20)) {
@@ -260,8 +262,8 @@ function getAvgOdds(item) {
         item.outcome.bookOdds?.BET365?.odds,
         item.outcome.bookOdds?.BETMGM?.odds,
         item.outcome.bookOdds?.PRIZEPICKS?.odds,
-        item.outcome.bookOdds?.UNDERDOG?.odds,
-        item.outcome.bookOdds?.SLEEPER?.odds,
+        // item.outcome.bookOdds?.UNDERDOG?.odds,
+        // item.outcome.bookOdds?.SLEEPER?.odds,
     ].map(odds => parseFloat(odds)).filter(odds => !isNaN(odds)); // Convert to numbers & remove NaN values
 
     if (sportsbookOdds.length > 0) {
@@ -289,14 +291,16 @@ function constructVisualizerPayload(filterType, sortingType) {
 function filterProps(item, filterType) {
     // return marketLabel.includes("Bruce Brown")  && noGoblinProps;
     let isOver = item.outcome.outcomeLabel === "Over";
-    if (!isOver) return null;
+    // if (!isOver) return null;
 
     let stats = item.stats;
     let lowTrendProps = stats.l10 <= 0.4 && stats.l5 <= 0.4
+    let midTrendProps = stats.l10 <= 0.5 && stats.l5 <= 0.6
     let inflatedProps = stats.l10 >= 0.8 && stats.l5 >= 0.8 && !isOver
     if (
         lowTrendProps 
     || inflatedProps
+    || midTrendProps
     ) {
         return false;
     }
@@ -305,7 +309,7 @@ function filterProps(item, filterType) {
     let outcomeLabel = item.outcome.outcomeLabel;
     let noGoblinProps = ppOdds !== -137
     let averageOdds = getAvgOdds(item)
-    let hasFavorableOdds = averageOdds !== null && averageOdds <= -125;
+    let hasFavorableOdds = averageOdds !== null && averageOdds <= -130;
 
     let goblinOdds = averageOdds !== null && averageOdds <= -400
     let goblinPicks = true 
@@ -317,7 +321,7 @@ function filterProps(item, filterType) {
     
     let highTrendPicks = noGoblinProps
         && stats.h2h >= 0.75
-        && stats.l5 > stats.l10
+        && stats.l5 >= stats.l10
 
     switch (filterType) {
         case FilterType.FILTER_GOBLINS:
@@ -325,7 +329,7 @@ function filterProps(item, filterType) {
         case FilterType.FILTER_HIGH_TREND:
             return highTrendPicks;
         case FilterType.FILTER_HIGH_ODDS:
-            return hasFavorableOdds && noGoblinProps;
+            return hasFavorableOdds && noGoblinProps //&& stats.h2h >= 0.75;
         default:
             return false;
     }
