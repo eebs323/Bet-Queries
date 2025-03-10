@@ -67,10 +67,19 @@ var template = `
     </table>
 `;
 
-// Retrieve stored defensive stats, entities, and schedule
-let defensiveStats = JSON.parse(pm.globals.get("DefensiveStats") || "{}");
-let entities = JSON.parse(pm.globals.get("Entities") || "{}");
-let schedule = JSON.parse(pm.globals.get("nbaScheduleData") || "{}");
+let leagueType = pm.environment.get("leagueType") || "NBA";
+let defensiveStatsKey = `${leagueType}DefensiveStats`;
+let entitiesKey = `${leagueType}Entities`;
+let scheduleKey = `${leagueType}Schedule`;
+
+let defensiveStats = JSON.parse(pm.globals.get(defensiveStatsKey) || "{}");
+let entities = JSON.parse(pm.globals.get(entitiesKey) || "{}");
+let schedule = JSON.parse(pm.globals.get(scheduleKey) || "{}");
+
+console.log(`Loaded data for league: ${leagueType}`);
+console.log(`Defensive Stats Key: ${defensiveStatsKey}`);
+console.log(`Entities Key: ${entitiesKey}`);
+console.log(`Schedule Data Key: ${scheduleKey}`);
 
 // Function to find opponent team in a game
 function findOpponentTeam(playerTeamId, eventId) {
@@ -108,8 +117,9 @@ function getOpponentDefenseRanking(playerTeamId, eventId, propType) {
         : team?.rankings?.statRankings?.overall?.defense 
         || [];
 
-    // Define stat mappings
+    // Define stat mappings for Basketball & Soccer
     const statMap = {
+        // Basketball Stats
         "POINTS_REBOUNDS_ASSISTS": "points|rebounds|assists",
         "FANTASY_SCORE_PP": "points|rebounds|assists", // Updated logic below for FANTASY_SCORE_PP
         "POINTS_REBOUNDS": "points|rebounds",
@@ -128,7 +138,21 @@ function getOpponentDefenseRanking(playerTeamId, eventId, propType) {
         "FIELD_GOALS_ATTEMPTED": "twoPointsAtt",
         "DEFENSIVE_REBOUNDS": "defRebounds",
         "OFFENSIVE_REBOUNDS": "offRebounds",
-        "MADE_FIELD_GOALS": "fieldGoalPct"
+        "MADE_FIELD_GOALS": "fieldGoalPct",
+
+        // Soccer Stats
+        "SHOTS_ON_GOAL": "shotsOnGoal",
+        "FOULS": "fouls",
+        "GOALS": "goals",
+        "ASSISTS_SOCCER": "assists",
+        "YELLOW_CARDS": "yellowCards",
+        "RED_CARDS": "redCards",
+        "SHOT_ATTEMPTS": "shotAttempts",
+        "DEFENSIVE_TACKLES": "totalTackles",
+        "PASSING_ATTEMPTS": "totalPasses",
+        "SAVES": "saves",
+        "DRIBBLE_ATTEMPTS": "totalDribbleAtt",
+        "CLEARANCES": "totalClearances"
     };
 
     // If the propType is FANTASY_SCORE_PP, calculate the average rank of "points|rebounds|assists" and "steals|blocks"
@@ -215,18 +239,24 @@ function mapProps(item, filterType) {
 
     let isOver = item.outcome.outcomeLabel === "Over";
     let defenseClass = "";
-    if (opponentDefenseRank !== "N/A" || filterType !== FilterType.GOBLIN_PROPS) {
-        if ((isOver && opponentDefenseRank >= 20) || (!isOver && opponentDefenseRank <= 10)) {
+    if (opponentDefenseRank !== "N/A" && filterType !== FilterType.FILTER_GOBLINS) {
+        const leagueThresholds = {
+            NBA: { heavy: 20, midHigh: 16, midLow: 10 },
+            NHL: { heavy: 22, midHigh: 17, midLow: 10 },
+            SOCCER: { heavy: 8, medium: 7 }
+        };
+
+        const { heavy, midHigh, midLow } = leagueThresholds[leagueType] || leagueThresholds["NBA"]; // Default to NBA
+
+        if ((isOver && opponentDefenseRank >= heavy) || (!isOver && opponentDefenseRank <= midLow)) {
             defenseClass = "dark-green-text";  // Heavy Favorable matchup
-        } else if ((isOver && opponentDefenseRank <= 10) || (!isOver && opponentDefenseRank >= 20)) {
+        } else if ((isOver && opponentDefenseRank <= midLow) || (!isOver && opponentDefenseRank >= heavy)) {
             defenseClass = "dark-red-text";  // Heavy Unfavorable matchup
             return null;
-        } else if ((!isOver && opponentDefenseRank <= 15) || (isOver && opponentDefenseRank >= 15)) {
-            defenseClass = "green-text";  // Medium favorable matchup
-            // return null;
-        } else if ((isOver && opponentDefenseRank <= 15) || (!isOver && opponentDefenseRank >= 15)) {
-            defenseClass = "red-text";  // Medium unfavorable matchup
-            // return null;
+        } else if ((!isOver && opponentDefenseRank <= midHigh) || (isOver && opponentDefenseRank >= midHigh)) {
+            defenseClass = "green-text";  // Medium Favorable matchup
+        } else {
+            defenseClass = "red-text";  // Medium Unfavorable matchup
         }
     }
 
@@ -276,9 +306,6 @@ function getAvgOdds(item) {
 
 function constructVisualizerPayload(filterType, sortingType) {
     var responseData = pm.response.json();
-    // if (filterType === FilterType.FILTER_GOBLINS) {
-    //     sortingType = SortingType.CUR_SEASON_FIRST;
-    // }
     var filteredData = responseData.props
         .filter(item => filterProps(item, filterType))
         .sort((a, b) => sortProps(a, b, sortingType))
@@ -291,7 +318,7 @@ function constructVisualizerPayload(filterType, sortingType) {
 function filterProps(item, filterType) {
     // return marketLabel.includes("Bruce Brown")  && noGoblinProps;
     let isOver = item.outcome.outcomeLabel === "Over";
-    // if (!isOver) return null;
+    if (!isOver) return null;
 
     let stats = item.stats;
     let lowTrendProps = stats.l10 <= 0.4 && stats.l5 <= 0.4
