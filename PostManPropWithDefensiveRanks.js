@@ -202,25 +202,25 @@ function sortProps(a, b, sortingType) {
     let trendB = (parseFloat(b.stats.l10) || 0) + (parseFloat(b.stats.l5) || 0);
 
     switch (sortingType) {
-        case SortingType.DEFENSE_RANK_FIRST:
+        case SortingType.SORT_DEFENSE_RANK:
             return defenseRankA !== defenseRankB ? defenseRankB - defenseRankA
                 : seasonB !== seasonA 
                     ? seasonB - seasonA
                     : bestOddsA - bestOddsB;
 
-        case SortingType.CUR_SEASON_FIRST:
+        case SortingType.SORT_SEASON:
             return seasonB !== seasonA 
                     ? seasonB - seasonA
                     : bestOddsA - bestOddsB;
 
-        case SortingType.SORT_ODDS_FIRST:
+        case SortingType.SORT_ODDS:
             return bestOddsA !== bestOddsB 
                     ? bestOddsA - bestOddsB
                     : trendB !== trendA 
                         ? trendB - trendA
                         : seasonB - seasonA;
 
-        case SortingType.TREND_FIRST:
+        case SortingType.SORT_TREND:
             return trendB !== trendA 
                     ? trendB - trendA
                     : seasonB - seasonA;
@@ -308,9 +308,9 @@ function getAvgOdds(item) {
         item.outcome.bookOdds?.DRAFTKINGS?.odds,
         item.outcome.bookOdds?.BET365?.odds,
         item.outcome.bookOdds?.BETMGM?.odds,
-        // item.outcome.bookOdds?.PRIZEPICKS?.odds,
-        // item.outcome.bookOdds?.UNDERDOG?.odds,
-        // item.outcome.bookOdds?.SLEEPER?.odds,
+        item.outcome.bookOdds?.PRIZEPICKS?.odds,
+        item.outcome.bookOdds?.UNDERDOG?.odds,
+        item.outcome.bookOdds?.SLEEPER?.odds
     ].map(odds => parseFloat(odds)).filter(odds => !isNaN(odds)); // Convert to numbers & remove NaN values
 
     if (sportsbookOdds.length > 0) {
@@ -334,8 +334,13 @@ function constructVisualizerPayload(filterType, sortingType) {
 
 function filterProps(item, filterType) {
     // return marketLabel.includes("Bruce Brown")  && noGoblinProps;
-    let isOver = item.outcome.outcomeLabel === "Over";
-    if (!isOver) return null;
+    let outcomeLabel = item.outcome.outcomeLabel;
+    let isOver = outcomeLabel == "Over"
+    let isUnder = outcomeLabel == "Under"
+    if (filterType === FilterType.FILTER_HIGH_TREND_OVERS && isUnder) return false;
+    if (filterType === FilterType.FILTER_HIGH_TREND_UNDERS && isOver) return false;
+
+    //if (!isOver) return null;
 
     let stats = item.stats;
     let lowTrendProps = stats.l10 <= 0.4 && stats.l5 <= 0.4
@@ -350,7 +355,6 @@ function filterProps(item, filterType) {
     }
     
     let ppOdds =  parseFloat(item.outcome.bookOdds.PRIZEPICKS?.odds);
-    let outcomeLabel = item.outcome.outcomeLabel;
     let noGoblinProps = ppOdds !== -137
     if (leagueType == "SOCCER") noGoblinProps = true;
     let averageOdds = getAvgOdds(item)
@@ -371,6 +375,8 @@ function filterProps(item, filterType) {
     switch (filterType) {
         case FilterType.FILTER_GOBLINS:
             return  goblinPicks || goblinOdds;
+        case FilterType.FILTER_HIGH_TREND_UNDERS:
+        case FilterType.FILTER_HIGH_TREND_OVERS:
         case FilterType.FILTER_HIGH_TREND:
             return highTrendPicks;
         case FilterType.FILTER_HIGH_ODDS:
@@ -381,22 +387,24 @@ function filterProps(item, filterType) {
 }
 
 const SortingType = {
-    CUR_SEASON_FIRST: "CurSeasonFirst",  // Sort by curSeason → bestOdds
-    SORT_ODDS_FIRST: "BestOddsFirst",    // Sort by bestOdds → curSeason
-    DEFENSE_RANK_FIRST: "DefenseRankFirst", // Sort by opponent defense ranking (Ascending: Easier Matchups First)
-    TREND_FIRST: "TrendFirst"
+    SORT_SEASON: "CurSeasonFirst",  // Sort by curSeason → bestOdds
+    SORT_ODDS: "SORT_ODDS",    // Sort by bestOdds → curSeason
+    SORT_DEFENSE_RANK: "SORT_DEFENSE_RANK", // Sort by opponent defense ranking (Ascending: Easier Matchups First)
+    SORT_TREND: "SORT_TREND"
 };
 
 const FilterType = {
     FILTER_GOBLINS: "FILTER_GOBLINS",
-    FILTER_HIGH_ODDS: "FILTER_HIGH_ODDS", // NEW: Combines PrizePicks, High Odds, and Strong Props
-    FILTER_HIGH_TREND: "FILTER_HIGH_TREND"
+    FILTER_HIGH_ODDS: "FILTER_HIGH_ODDS",
+    FILTER_HIGH_TREND: "FILTER_HIGH_TREND",
+    FILTER_HIGH_TREND_OVERS: "FILTER_HIGH_TREND_OVERS", // NEW: Show only "Over" props
+    FILTER_HIGH_TREND_UNDERS: "FILTER_HIGH_TREND_UNDERS", // NEW: Show only "Under" props
 };
 
 pm.visualizer.set(
     template, 
     constructVisualizerPayload(
         FilterType.FILTER_HIGH_TREND,  
-        SortingType.SORT_ODDS_FIRST
+        SortingType.SORT_TREND
     )
 );
