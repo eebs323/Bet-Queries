@@ -379,8 +379,8 @@ function filterProps(item, filterType) {
         case FilterType.FILTER_HIGH_TREND_OVERS:
         case FilterType.FILTER_HIGH_TREND:
             return highTrendPicks;
-        case FILTER_HIGH_ODDS_UNDERS:
-        case FILTER_HIGH_ODDS_OVERS:
+        case FilterType.FILTER_HIGH_ODDS_UNDERS:
+        case FilterType.FILTER_HIGH_ODDS_OVERS:
         case FilterType.FILTER_HIGH_ODDS:
             return hasFavorableOdds && noGoblinProps //&& stats.h2h >= 0.75;
         default:
@@ -400,7 +400,6 @@ const FilterType = {
     FILTER_HIGH_ODDS: "FILTER_HIGH_ODDS",
     FILTER_HIGH_ODDS_OVERS: "FILTER_HIGH_ODDS_OVERS", // NEW: Show only "Over" props
     FILTER_HIGH_ODDS_UNDERS: "FILTER_HIGH_ODDS_UNDERS", // NEW: Show only "Under" props
-
     FILTER_HIGH_TREND: "FILTER_HIGH_TREND",
     FILTER_HIGH_TREND_OVERS: "FILTER_HIGH_TREND_OVERS", // NEW: Show only "Over" props
     FILTER_HIGH_TREND_UNDERS: "FILTER_HIGH_TREND_UNDERS", // NEW: Show only "Under" props
@@ -409,7 +408,7 @@ const FilterType = {
 pm.visualizer.set(
     template, 
     constructVisualizerPayload(
-        FilterType.FILTER_GOBLINS,  
+        FilterType.FILTER_HIGH_ODDS_OVERS,  
         SortingType.SORT_ODDS
     )
 );
