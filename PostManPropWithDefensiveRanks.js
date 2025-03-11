@@ -230,7 +230,6 @@ function sortProps(a, b, sortingType) {
     }
 }
 
-
 function mapProps(item, filterType) {
     let isPrizePicks = item.outcome.bookOdds.PRIZEPICKS !== undefined;
     let includeItem = isPrizePicks;
@@ -308,7 +307,7 @@ function getAvgOdds(item) {
         item.outcome.bookOdds?.DRAFTKINGS?.odds,
         item.outcome.bookOdds?.BET365?.odds,
         item.outcome.bookOdds?.BETMGM?.odds,
-        item.outcome.bookOdds?.PRIZEPICKS?.odds,
+        // item.outcome.bookOdds?.PRIZEPICKS?.odds,
         item.outcome.bookOdds?.UNDERDOG?.odds,
         item.outcome.bookOdds?.SLEEPER?.odds
     ].map(odds => parseFloat(odds)).filter(odds => !isNaN(odds)); // Convert to numbers & remove NaN values
@@ -337,10 +336,8 @@ function filterProps(item, filterType) {
     let outcomeLabel = item.outcome.outcomeLabel;
     let isOver = outcomeLabel == "Over"
     let isUnder = outcomeLabel == "Under"
-    if (filterType === FilterType.FILTER_HIGH_TREND_OVERS && isUnder) return false;
-    if (filterType === FilterType.FILTER_HIGH_TREND_UNDERS && isOver) return false;
-
-    //if (!isOver) return null;
+    if ((filterType == FilterType.FILTER_HIGH_TREND_OVERS || filterType == FilterType.FILTER_HIGH_ODDS_OVERS) && isUnder) return false;
+    if ((filterType == FilterType.FILTER_HIGH_TREND_UNDERS || filterType == FilterType.FILTER_HIGH_ODDS_UNDERS) && isOver) return false;
 
     let stats = item.stats;
     let lowTrendProps = stats.l10 <= 0.4 && stats.l5 <= 0.4
@@ -356,9 +353,9 @@ function filterProps(item, filterType) {
     
     let ppOdds =  parseFloat(item.outcome.bookOdds.PRIZEPICKS?.odds);
     let noGoblinProps = ppOdds !== -137
-    if (leagueType == "SOCCER") noGoblinProps = true;
+    
     let averageOdds = getAvgOdds(item)
-    let hasFavorableOdds = averageOdds !== null && averageOdds <= -130;
+    let hasFavorableOdds = averageOdds !== null && averageOdds <= -125;
 
     let goblinOdds = averageOdds !== null && averageOdds <= -400
     let goblinPicks = true 
@@ -371,7 +368,10 @@ function filterProps(item, filterType) {
     let highTrendPicks = noGoblinProps
         && stats.h2h >= 0.75
         && stats.l5 >= stats.l10
-
+    
+    if (leagueType == "SOCCER"){
+        return (goblinPicks || goblinOdds) && highTrendPicks;
+    }
     switch (filterType) {
         case FilterType.FILTER_GOBLINS:
             return  goblinPicks || goblinOdds;
@@ -379,6 +379,8 @@ function filterProps(item, filterType) {
         case FilterType.FILTER_HIGH_TREND_OVERS:
         case FilterType.FILTER_HIGH_TREND:
             return highTrendPicks;
+        case FILTER_HIGH_ODDS_UNDERS:
+        case FILTER_HIGH_ODDS_OVERS:
         case FilterType.FILTER_HIGH_ODDS:
             return hasFavorableOdds && noGoblinProps //&& stats.h2h >= 0.75;
         default:
@@ -396,6 +398,9 @@ const SortingType = {
 const FilterType = {
     FILTER_GOBLINS: "FILTER_GOBLINS",
     FILTER_HIGH_ODDS: "FILTER_HIGH_ODDS",
+    FILTER_HIGH_ODDS_OVERS: "FILTER_HIGH_ODDS_OVERS", // NEW: Show only "Over" props
+    FILTER_HIGH_ODDS_UNDERS: "FILTER_HIGH_ODDS_UNDERS", // NEW: Show only "Under" props
+
     FILTER_HIGH_TREND: "FILTER_HIGH_TREND",
     FILTER_HIGH_TREND_OVERS: "FILTER_HIGH_TREND_OVERS", // NEW: Show only "Over" props
     FILTER_HIGH_TREND_UNDERS: "FILTER_HIGH_TREND_UNDERS", // NEW: Show only "Under" props
@@ -404,7 +409,7 @@ const FilterType = {
 pm.visualizer.set(
     template, 
     constructVisualizerPayload(
-        FilterType.FILTER_HIGH_TREND,  
-        SortingType.SORT_TREND
+        FilterType.FILTER_GOBLINS,  
+        SortingType.SORT_ODDS
     )
 );
