@@ -255,7 +255,7 @@ function mapProps(item, filterType) {
 
     let isOver = item.outcome.outcomeLabel === "Over";
     let defenseClass = "";
-    if (opponentDefenseRank !== "N/A" && filterType !== FilterType.FILTER_GOBLINS) {
+    if (opponentDefenseRank != "N/A") {
         const leagueThresholds = {
             NBA: { heavy: 20, midHigh: 16, midLow: 10 },
             NHL: { heavy: 22, midHigh: 17, midLow: 10 },
@@ -268,7 +268,7 @@ function mapProps(item, filterType) {
             defenseClass = "dark-green-text";  // Heavy Favorable matchup
         } else if ((isOver && opponentDefenseRank <= midLow) || (!isOver && opponentDefenseRank >= heavy)) {
             defenseClass = "dark-red-text";  // Heavy Unfavorable matchup
-            return null;
+            if (filterType != FilterType.FILTER_GOBLINS) return null;
         } else if ((!isOver && opponentDefenseRank <= midHigh) || (isOver && opponentDefenseRank >= midHigh)) {
             defenseClass = "green-text";  // Medium Favorable matchup
         } else {
@@ -308,8 +308,8 @@ function getAvgOdds(item) {
         item.outcome.bookOdds?.BET365?.odds,
         item.outcome.bookOdds?.BETMGM?.odds,
         // item.outcome.bookOdds?.PRIZEPICKS?.odds,
-        item.outcome.bookOdds?.UNDERDOG?.odds,
-        item.outcome.bookOdds?.SLEEPER?.odds
+        // item.outcome.bookOdds?.UNDERDOG?.odds,
+        // item.outcome.bookOdds?.SLEEPER?.odds
     ].map(odds => parseFloat(odds)).filter(odds => !isNaN(odds)); // Convert to numbers & remove NaN values
 
     if (sportsbookOdds.length > 0) {
@@ -325,11 +325,10 @@ function constructVisualizerPayload(filterType, sortingType) {
     var filteredData = responseData.props
         .filter(item => filterProps(item, filterType))
         .sort((a, b) => sortProps(a, b, sortingType))
-        .map(mapProps, filterType)
+        .map(item => mapProps(item, filterType))
         .filter(item => item !== null); // Remove null values
     return { filteredData };
 }
-
 
 function filterProps(item, filterType) {
     // return marketLabel.includes("Bruce Brown")  && noGoblinProps;
@@ -342,7 +341,7 @@ function filterProps(item, filterType) {
     let stats = item.stats;
     let lowTrendProps = stats.l10 <= 0.4 && stats.l5 <= 0.4
     let midTrendProps = stats.l10 <= 0.5 && stats.l5 <= 0.6
-    let inflatedProps = stats.l10 >= 0.8 && stats.l5 >= 0.8 && !isOver
+    let inflatedProps = stats.l10 >= 0.8 && stats.l5 >= 0.8 && (!isOver || filterType != FilterType.FILTER_GOBLINS)
     if (
         lowTrendProps 
     || inflatedProps
@@ -355,26 +354,27 @@ function filterProps(item, filterType) {
     let noGoblinProps = ppOdds !== -137
     
     let averageOdds = getAvgOdds(item)
-    let hasFavorableOdds = averageOdds !== null && averageOdds <= -125;
-
-    let goblinOdds = averageOdds !== null && averageOdds <= -400
-    let goblinPicks = true 
-        && stats.h2h >= 0.75
-        && stats.l10 >= 0.7
-        && stats.l5 >= stats.l10
-        && stats.curSeason >= 0.75
-        && outcomeLabel == "Over";
+    let hasFavorableOdds = averageOdds !== null && averageOdds <= -126;
     
     let highTrendPicks = noGoblinProps
         && stats.h2h >= 0.75
-        && stats.l5 >= stats.l10
+        && stats.l5 >= (stats.l10 * 0.8)
     
-    if (leagueType == "SOCCER"){
+    if (leagueType == "SOCCER") {
         return (goblinPicks || goblinOdds) && highTrendPicks;
     }
+
+    let goblinOdds = averageOdds !== null && averageOdds <= -400
+    let goblinPicks = goblinOdds
+        || (
+            highTrendPicks
+            && stats.curSeason >= 0.8
+            && isOver
+            )
+
     switch (filterType) {
         case FilterType.FILTER_GOBLINS:
-            return  goblinPicks || goblinOdds;
+            return goblinPicks;
         case FilterType.FILTER_HIGH_TREND_UNDERS:
         case FilterType.FILTER_HIGH_TREND_OVERS:
         case FilterType.FILTER_HIGH_TREND:
@@ -408,7 +408,7 @@ const FilterType = {
 pm.visualizer.set(
     template, 
     constructVisualizerPayload(
-        FilterType.FILTER_HIGH_ODDS_OVERS,  
-        SortingType.SORT_ODDS
+        FilterType.FILTER_GOBLINS,
+        SortingType.SORT_SEASON
     )
 );
