@@ -34,15 +34,13 @@ var template = `
                 <th>Player</th>
                 <th>Type</th>
                 <th>Line</th>
+                <th>L20</th>
                 <th>L10</th>
                 <th>L5</th>
                 <th>H2H</th>
                 <th>Szn</th>
-                <th>D Rank</th>
+                <th>DRank</th>
                 <th>ODDS</th>
-                <th>PP</th>
-                <th>SL</th>
-                <th>UD</th>
                 <th>FD</th>
                 <th>DK</th>
                 <th>CSRS</th>
@@ -56,15 +54,13 @@ var template = `
                 <td>{{player}}</td>
                 <td>{{type}}</td>
                 <td>{{line}}</td>
+                <td>{{l20}}</td>
                 <td>{{l10}}</td>
                 <td>{{l5}}</td>
                 <td>{{h2h}}</td>
                 <td>{{curSeason}}</td>
                 <td class="{{defenseClass}}">{{defenseRank}}</td>
                 <td>{{AVG_ODDS}}</td>
-                <td>{{PP_odds}}</td>
-                <td>{{SleeperOdds}}</td>
-                <td>{{UD_odds}}</td>
                 <td>{{FANDUEL_odds}}</td>
                 <td>{{DK_odds}}</td>
                 <td>{{CAESARS_odds}}</td>
@@ -113,7 +109,7 @@ function getOpponentDefenseRanking(playerTeamId, eventId, propType) {
 
         const team = leagueSeason.teams?.find(team => team.teamId === opponentTeamId);
         if (!team) return "N/A";
-        
+
         defenseStats = team?.rankings?.statRankings?.overall?.defense || [];
     } else {
         const currentSeason = defensiveStats.content?.seasons?.find(season => season.year == '2024');
@@ -123,14 +119,14 @@ function getOpponentDefenseRanking(playerTeamId, eventId, propType) {
         if (!team) return "N/A";
 
         defenseStats = (
-            propType === "STEALS" 
-            || propType === "STEALS_BLOCKS" 
+            propType === "STEALS"
+            || propType === "STEALS_BLOCKS"
             || propType === "BLOCKS"
             || propType === "DEFENSIVE_REBOUNDS"
             || propType === "TURNOVERS"
-        ) 
+        )
             ? team?.rankings?.statRankings?.overall?.offense
-            : team?.rankings?.statRankings?.overall?.defense 
+            : team?.rankings?.statRankings?.overall?.defense
             || [];
     }
 
@@ -204,26 +200,26 @@ function sortProps(a, b, sortingType) {
     switch (sortingType) {
         case SortingType.SORT_DEFENSE_RANK:
             return defenseRankA !== defenseRankB ? defenseRankB - defenseRankA
-                : seasonB !== seasonA 
+                : seasonB !== seasonA
                     ? seasonB - seasonA
                     : bestOddsA - bestOddsB;
 
         case SortingType.SORT_SEASON:
-            return seasonB !== seasonA 
-                    ? seasonB - seasonA
-                    : bestOddsA - bestOddsB;
+            return seasonB !== seasonA
+                ? seasonB - seasonA
+                : bestOddsA - bestOddsB;
 
         case SortingType.SORT_ODDS:
-            return bestOddsA !== bestOddsB 
-                    ? bestOddsA - bestOddsB
-                    : trendB !== trendA 
-                        ? trendB - trendA
-                        : seasonB - seasonA;
-
-        case SortingType.SORT_TREND:
-            return trendB !== trendA 
+            return bestOddsA !== bestOddsB
+                ? bestOddsA - bestOddsB
+                : trendB !== trendA
                     ? trendB - trendA
                     : seasonB - seasonA;
+
+        case SortingType.SORT_TREND:
+            return trendB !== trendA
+                ? trendB - trendA
+                : seasonB - seasonA;
 
         default:
             return 0;
@@ -247,10 +243,10 @@ function mapProps(item, filterType) {
 
     // Get defensive ranking
     let opponentDefenseRank = getOpponentDefenseRanking(item.outcome.teamId, item.outcome.eventId, item.outcome.proposition);
-    
+
     // **🚨 Filter out props with "N/A" defense ranking or "Unknown Team" opponent 🚨**
     if (opponentDefenseRank == "N/A" && opponentTeamName == "Unknown Team") {
-        // return null;
+        return null;
     }
 
     let isOver = item.outcome.outcomeLabel === "Over";
@@ -268,35 +264,38 @@ function mapProps(item, filterType) {
             defenseClass = "dark-green-text";  // Heavy Favorable matchup
         } else if ((isOver && opponentDefenseRank <= midLow) || (!isOver && opponentDefenseRank >= heavy)) {
             defenseClass = "dark-red-text";  // Heavy Unfavorable matchup
-            if (filterType != FilterType.FILTER_GOBLINS) return null;
+            // if (filterType != FilterType.FILTER_GOBLINS)
+            // return null;
         } else if ((!isOver && opponentDefenseRank <= midHigh) || (isOver && opponentDefenseRank >= midHigh)) {
             defenseClass = "green-text";  // Medium Favorable matchup
         } else {
             defenseClass = "red-text";  // Medium Unfavorable matchup
+            // return null;
         }
     }
 
     return includeItem
         ? {
-              player: `${item.outcome.marketLabel} vs ${opponentTeamName}`, // Updated player column
-              type: item.outcome.outcomeLabel,
-              line: item.outcome.line,
-              l10: item.stats.l10,
-              l5: item.stats.l5,
-              h2h: item.stats.h2h,
-              curSeason: item.stats.curSeason,
-              defenseRank: opponentDefenseRank,
-              defenseClass,
-              CAESARS_odds: item.outcome.bookOdds.CAESARS?.odds,
-              FANDUEL_odds: item.outcome.bookOdds.FANDUEL?.odds,
-              DK_odds: item.outcome.bookOdds.DRAFTKINGS?.odds,
-              BET365_odds: item.outcome.bookOdds.BET365?.odds,
-              MGM_odds: item.outcome.bookOdds.BETMGM?.odds,
-              PP_odds: item.outcome.bookOdds.PRIZEPICKS?.odds,
-              UD_odds: item.outcome.bookOdds.UNDERDOG?.odds,
-              SleeperOdds:  item.outcome.bookOdds.SLEEPER?.odds,
-              AVG_ODDS: getAvgOdds(item)
-          }
+            player: `${item.outcome.marketLabel} vs ${opponentTeamName}`, // Updated player column
+            type: item.outcome.outcomeLabel,
+            line: item.outcome.line,
+            l20: item.stats.l20,
+            l10: item.stats.l10,
+            l5: item.stats.l5,
+            h2h: item.stats.h2h,
+            curSeason: item.stats.curSeason,
+            defenseRank: opponentDefenseRank,
+            defenseClass,
+            CAESARS_odds: item.outcome.bookOdds.CAESARS?.odds,
+            FANDUEL_odds: item.outcome.bookOdds.FANDUEL?.odds,
+            DK_odds: item.outcome.bookOdds.DRAFTKINGS?.odds,
+            BET365_odds: item.outcome.bookOdds.BET365?.odds,
+            MGM_odds: item.outcome.bookOdds.BETMGM?.odds,
+            PP_odds: item.outcome.bookOdds.PRIZEPICKS?.odds,
+            UD_odds: item.outcome.bookOdds.UNDERDOG?.odds,
+            SleeperOdds: item.outcome.bookOdds.SLEEPER?.odds,
+            AVG_ODDS: getAvgOdds(item)
+        }
         : null;
 }
 
@@ -313,8 +312,8 @@ function getAvgOdds(item) {
     ].map(odds => parseFloat(odds)).filter(odds => !isNaN(odds)); // Convert to numbers & remove NaN values
 
     if (sportsbookOdds.length > 0) {
-       let averageOdds = Math.round(sportsbookOdds.reduce((sum, odds) => sum + odds, 0) / sportsbookOdds.length)
-       return averageOdds
+        let averageOdds = Math.round(sportsbookOdds.reduce((sum, odds) => sum + odds, 0) / sportsbookOdds.length)
+        return averageOdds
     } else {
         return null
     }
@@ -335,42 +334,51 @@ function filterProps(item, filterType) {
     let outcomeLabel = item.outcome.outcomeLabel;
     let isOver = outcomeLabel == "Over"
     let isUnder = outcomeLabel == "Under"
-    if ((filterType == FilterType.FILTER_HIGH_TREND_OVERS || filterType == FilterType.FILTER_HIGH_ODDS_OVERS) && isUnder) return false;
-    if ((filterType == FilterType.FILTER_HIGH_TREND_UNDERS || filterType == FilterType.FILTER_HIGH_ODDS_UNDERS) && isOver) return false;
+    const overFilters = new Set([
+        FilterType.FILTER_HIGH_TREND_OVERS,
+        FilterType.FILTER_HIGH_ODDS_OVERS,
+        FilterType.FILTER_HIGH_ODDS_HIGH_TREND_OVERS
+    ]);
+
+    const underFilters = new Set([
+        FilterType.FILTER_HIGH_TREND_UNDERS,
+        FilterType.FILTER_HIGH_ODDS_UNDERS,
+        FilterType.FILTER_HIGH_ODDS_HIGH_TREND_UNDERS
+    ]);
+
+    if (overFilters.has(filterType) && isUnder) return false;
+    if (underFilters.has(filterType) && isOver) return false;
 
     let stats = item.stats;
     let lowTrendProps = stats.l10 <= 0.4 && stats.l5 <= 0.4
     let midTrendProps = stats.l10 <= 0.5 && stats.l5 <= 0.6
-    let inflatedProps = stats.l10 >= 0.8 && stats.l5 >= 0.8 && (!isOver || filterType != FilterType.FILTER_GOBLINS)
-    if (
-        lowTrendProps 
-    || inflatedProps
-    || midTrendProps
-    ) {
-        return false;
-    }
-    
-    let ppOdds =  parseFloat(item.outcome.bookOdds.PRIZEPICKS?.odds);
+    let inflatedProps = stats.l10 >= 0.8 && stats.l5 >= 0.8 && !isOver
+    let ppOdds = parseFloat(item.outcome.bookOdds.PRIZEPICKS?.odds);
     let noGoblinProps = ppOdds !== -137
-    
     let averageOdds = getAvgOdds(item)
-    let hasFavorableOdds = averageOdds !== null && averageOdds <= -126;
-    
+    let hasFavorableOdds = averageOdds !== null && averageOdds <= -130;
+
     let highTrendPicks = noGoblinProps
-        && stats.h2h >= 0.75
-        && stats.l5 >= (stats.l10 * 0.8)
-    
-    if (leagueType == "SOCCER") {
-        return (goblinPicks || goblinOdds) && highTrendPicks;
-    }
+        && (stats.l10 > stats.l20)
+        && (stats.l5 > stats.l10 || stats.l10 >= 0.9)
 
     let goblinOdds = averageOdds !== null && averageOdds <= -400
     let goblinPicks = goblinOdds
-        || (
-            highTrendPicks
-            && stats.curSeason >= 0.8
+        || (stats.l5 >= (stats.l10 * 0.9)
+            && stats.curSeason >= 0.7
             && isOver
-            )
+        )
+
+    if (
+        lowTrendProps
+        || inflatedProps
+        || midTrendProps
+        || stats.h2h < 0.5
+        || stats.l10 == undefined
+        // || averageOdds >= -110
+    ) {
+        return false;
+    }
 
     switch (filterType) {
         case FilterType.FILTER_GOBLINS:
@@ -382,7 +390,11 @@ function filterProps(item, filterType) {
         case FilterType.FILTER_HIGH_ODDS_UNDERS:
         case FilterType.FILTER_HIGH_ODDS_OVERS:
         case FilterType.FILTER_HIGH_ODDS:
-            return hasFavorableOdds && noGoblinProps //&& stats.h2h >= 0.75;
+            return hasFavorableOdds && noGoblinProps;
+        case FilterType.FILTER_HIGH_ODDS_HIGH_TREND_UNDERS:
+        case FilterType.FILTER_HIGH_ODDS_HIGH_TREND_OVERS:
+        case FilterType.FILTER_HIGH_ODDS_HIGH_TREND:
+            return noGoblinProps && (highTrendPicks || hasFavorableOdds)
         default:
             return false;
     }
@@ -403,12 +415,15 @@ const FilterType = {
     FILTER_HIGH_TREND: "FILTER_HIGH_TREND",
     FILTER_HIGH_TREND_OVERS: "FILTER_HIGH_TREND_OVERS", // NEW: Show only "Over" props
     FILTER_HIGH_TREND_UNDERS: "FILTER_HIGH_TREND_UNDERS", // NEW: Show only "Under" props
+    FILTER_HIGH_ODDS_HIGH_TREND: "FILTER_HIGH_ODDS_HIGH_TREND",
+    FILTER_HIGH_ODDS_HIGH_TREND_OVERS: "FILTER_HIGH_ODDS_HIGH_TREND_OVERS",
+    FILTER_HIGH_ODDS_HIGH_TREND_UNDERS: "FILTER_HIGH_ODDS_HIGH_TREND_UNDERS",
 };
 
 pm.visualizer.set(
-    template, 
+    template,
     constructVisualizerPayload(
-        FilterType.FILTER_GOBLINS,
-        SortingType.SORT_SEASON
+        FilterType.FILTER_HIGH_ODDS_HIGH_TREND,
+        SortingType.SORT_ODDS
     )
 );
