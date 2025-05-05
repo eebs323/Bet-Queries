@@ -27,6 +27,7 @@ var template = `
         .green-text { color: green; }
         .dark-red-text { color: red; font-weight: bold; }
         .red-text { color: red; }
+        .orange-text {color: orange; }
     </style>
     <table>
         <thead>
@@ -54,11 +55,11 @@ var template = `
                 <td>{{player}}</td>
                 <td>{{type}}</td>
                 <td>{{line}}</td>
-                <td>{{l20}}</td>
-                <td>{{l10}}</td>
-                <td>{{l5}}</td>
-                <td>{{h2h}}</td>
-                <td>{{curSeason}}</td>
+                <td class="{{l20Color}}">{{l20}}</td>
+                <td class="{{l10Color}}">{{l10}}</td>
+                <td class="{{l5Color}}">{{l5}}</td>
+                <td class="{{h2hColor}}">{{h2h}}</td>
+                <td class="{{curSeasonColor}}">{{curSeason}}</td>
                 <td class="{{defenseClass}}">{{defenseRank}}</td>
                 <td>{{AVG_ODDS}}</td>
                 <td>{{FANDUEL_odds}}</td>
@@ -86,6 +87,12 @@ console.log(`Loaded data for league: ${leagueType}`);
 console.log(`Defensive Stats Key: ${defensiveStats}`);
 console.log(`Entities Key: ${entities}`);
 console.log(`Schedule Data Key: ${schedule}`);
+
+function getTrendColor(value) {
+  if (value >= 0.6) return 'green-text';
+  if (value >= 0.4) return 'orange-text';
+  return 'red-text';
+}
 
 // Function to find opponent team in a game
 function findOpponentTeam(playerTeamId, eventId) {
@@ -194,8 +201,9 @@ function sortProps(a, b, sortingType) {
     let seasonB = parseFloat(b.stats.curSeason) || 0;
     let defenseRankA = parseFloat(getOpponentDefenseRanking(a.outcome.teamId, a.outcome.eventId, a.outcome.proposition)) || 30;
     let defenseRankB = parseFloat(getOpponentDefenseRanking(b.outcome.teamId, b.outcome.eventId, b.outcome.proposition)) || 30;
-    let trendA = (parseFloat(a.stats.l10) || 0) + (parseFloat(a.stats.l5) || 0);
-    let trendB = (parseFloat(b.stats.l10) || 0) + (parseFloat(b.stats.l5) || 0);
+    let trendA = (parseFloat(a.stats.h2h) || 0) + (parseFloat(a.stats.l5) || 0);
+    let trendB = (parseFloat(b.stats.h2h) || 0) + (parseFloat(b.stats.l5) || 0);
+    let sortTrend = trendB !== trendA ? trendB - trendA : seasonB - seasonA;
 
     switch (sortingType) {
         case SortingType.SORT_DEFENSE_RANK:
@@ -210,23 +218,21 @@ function sortProps(a, b, sortingType) {
                 : bestOddsA - bestOddsB;
 
         case SortingType.SORT_ODDS:
-            return bestOddsA !== bestOddsB
-                ? bestOddsA - bestOddsB
-                : trendB !== trendA
-                    ? trendB - trendA
-                    : seasonB - seasonA;
-
+            return (bestOddsA !== bestOddsB) ? bestOddsA - bestOddsB : sortTrend
         case SortingType.SORT_TREND:
-            return trendB !== trendA
-                ? trendB - trendA
-                : seasonB - seasonA;
-
+            return sortTrend
         default:
             return 0;
     }
 }
 
 function mapProps(item, filterType) {
+    let l20Color = getTrendColor(parseFloat(item.stats.l20));
+    let l10Color = getTrendColor(parseFloat(item.stats.l10));
+    let l5Color = getTrendColor(parseFloat(item.stats.l5));
+    let h2hColor = getTrendColor(parseFloat(item.stats.h2h));
+    let curSeasonColor = getTrendColor(parseFloat(item.stats.curSeason));
+
     let isPrizePicks = item.outcome.bookOdds.PRIZEPICKS !== undefined;
     let includeItem = isPrizePicks;
 
@@ -276,7 +282,7 @@ function mapProps(item, filterType) {
 
     return includeItem
         ? {
-            player: `${item.outcome.marketLabel} vs ${opponentTeamName}`, // Updated player column
+            player: `${item.outcome.marketLabel} vs ${opponentTeamName}`,
             type: item.outcome.outcomeLabel,
             line: item.outcome.line,
             l20: item.stats.l20,
@@ -284,6 +290,11 @@ function mapProps(item, filterType) {
             l5: item.stats.l5,
             h2h: item.stats.h2h,
             curSeason: item.stats.curSeason,
+            l20Color,
+            l10Color,
+            l5Color,
+            h2hColor,
+            curSeasonColor,
             defenseRank: opponentDefenseRank,
             defenseClass,
             CAESARS_odds: item.outcome.bookOdds.CAESARS?.odds,
@@ -351,8 +362,8 @@ function filterProps(item, filterType) {
 
     let stats = item.stats;
     let lowTrendProps = stats.l10 <= 0.4 && stats.l5 <= 0.4
-    let midTrendProps = stats.l10 <= 0.5 && stats.l5 <= 0.6
-    let inflatedProps = stats.l10 >= 0.8 && stats.l5 >= 0.8 && !isOver
+    let midTrendProps = stats.l10 <= 0.4 && stats.l5 <= 0.6
+    let inflatedProps = stats.l10 >= 0.4 && stats.l5 >= 0.8 && isUnder
     let ppOdds = parseFloat(item.outcome.bookOdds.PRIZEPICKS?.odds);
     let noGoblinProps = ppOdds !== -137
     let averageOdds = getAvgOdds(item)
@@ -370,12 +381,14 @@ function filterProps(item, filterType) {
         )
 
     if (
-        lowTrendProps
-        || inflatedProps
-        || midTrendProps
-        || stats.h2h < 0.5
-        || stats.l10 == undefined
-        // || averageOdds >= -110
+        lowTrendProps || 
+        inflatedProps || 
+        midTrendProps || 
+        stats.h2h < .5 ||
+        stats.l10 == undefined ||
+        averageOdds >= 100 ||
+        stats.l5 + stats.h2h < 1
+        || stats.curSeason < .5
     ) {
         return false;
     }
@@ -423,7 +436,7 @@ const FilterType = {
 pm.visualizer.set(
     template,
     constructVisualizerPayload(
-        FilterType.FILTER_HIGH_ODDS_HIGH_TREND,
+        FilterType.FILTER_HIGH_ODDS,
         SortingType.SORT_ODDS
     )
 );
