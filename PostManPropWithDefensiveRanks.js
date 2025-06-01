@@ -7,6 +7,8 @@ const CompetitionId = {
     USA_MLS: "USA_MLS"              // Major League Soccer (MLS)
 };
 
+const isPlayoffs = pm.environment.get("isPlayoffs") === "true";
+
 var template = `
     <style>
         table {
@@ -35,13 +37,13 @@ var template = `
                 <th>Player</th>
                 <th>Type</th>
                 <th>Line</th>
-                <th>L20</th>
+                {{#unless isPlayoffs}}<th>L20</th>{{/unless}}
                 <th>L10</th>
                 <th>L5</th>
                 <th>H2H</th>
-                <th>Szn</th>
-                <th>DRank</th>
-                <th>ODDS</th>
+                {{#unless isPlayoffs}}<th>Szn</th>{{/unless}}
+                {{#unless isPlayoffs}}<th>DRank</th>{{/unless}}
+                <th>AVGODDS</th>
                 <th>FD</th>
                 <th>DK</th>
                 <th>CSRS</th>
@@ -55,12 +57,12 @@ var template = `
                 <td>{{player}}</td>
                 <td>{{type}}</td>
                 <td>{{line}}</td>
-                <td class="{{l20Color}}">{{l20}}</td>
+                {{#unless ../isPlayoffs}}<td class="{{l20Color}}">{{l20}}</td>{{/unless}}
                 <td class="{{l10Color}}">{{l10}}</td>
                 <td class="{{l5Color}}">{{l5}}</td>
                 <td class="{{h2hColor}}">{{h2h}}</td>
-                <td class="{{curSeasonColor}}">{{curSeason}}</td>
-                <td class="{{defenseClass}}">{{defenseRank}}</td>
+                {{#unless ../isPlayoffs}}<td class="{{curSeasonColor}}">{{curSeason}}</td>{{/unless}}
+                {{#unless ../isPlayoffs}}<td class="{{defenseClass}}">{{defenseRank}}</td>{{/unless}}
                 <td>{{AVG_ODDS}}</td>
                 <td>{{FANDUEL_odds}}</td>
                 <td>{{DK_odds}}</td>
@@ -81,17 +83,19 @@ let scheduleKey = `${leagueType}Schedule`;
 let defensiveStats = JSON.parse(pm.globals.get(defensiveStatsKey) || "{}");
 let entities = JSON.parse(pm.globals.get(entitiesKey) || "{}");
 let schedule = JSON.parse(pm.globals.get(scheduleKey) || "{}");
-let competitionId = pm.environment.get("competitionId")
+let competitionId = pm.environment.get("competitionId");
+let showOnlyGoblins = pm.environment.get("showOnlyGoblins") === "true";
 
+console.log(`showOnlyGoblins: ${showOnlyGoblins}`);
 console.log(`Loaded data for league: ${leagueType}`);
 console.log(`Defensive Stats Key: ${defensiveStats}`);
 console.log(`Entities Key: ${entities}`);
 console.log(`Schedule Data Key: ${schedule}`);
 
 function getTrendColor(value) {
-  if (value >= 0.6) return 'green-text';
-  if (value >= 0.4) return 'orange-text';
-  return 'red-text';
+    if (value >= 0.6) return 'green-text';
+    if (value >= 0.4) return 'orange-text';
+    return 'red-text';
 }
 
 // Function to find opponent team in a game
@@ -159,6 +163,7 @@ function getOpponentDefenseRanking(playerTeamId, eventId, propType) {
         "DEFENSIVE_REBOUNDS": "defRebounds",
         "OFFENSIVE_REBOUNDS": "offRebounds",
         "MADE_FIELD_GOALS": "fieldGoalPct",
+        "PERSONAL_FOULS": "",
 
         // Soccer Stats
         "SHOTS_ON_GOAL": "shotsOnGoal",
@@ -201,8 +206,19 @@ function sortProps(a, b, sortingType) {
     let seasonB = parseFloat(b.stats.curSeason) || 0;
     let defenseRankA = parseFloat(getOpponentDefenseRanking(a.outcome.teamId, a.outcome.eventId, a.outcome.proposition)) || 30;
     let defenseRankB = parseFloat(getOpponentDefenseRanking(b.outcome.teamId, b.outcome.eventId, b.outcome.proposition)) || 30;
-    let trendA = (parseFloat(a.stats.h2h) || 0) + (parseFloat(a.stats.l5) || 0);
-    let trendB = (parseFloat(b.stats.h2h) || 0) + (parseFloat(b.stats.l5) || 0);
+    const ah2h = parseFloat(a.stats.h2h) || 0;
+    const al5 = parseFloat(a.stats.l5) || 0;
+    const al10 = parseFloat(a.stats.l10) || 0;
+    const bh2h = parseFloat(a.stats.h2h) || 0;
+    const bl5 = parseFloat(a.stats.l5) || 0;
+    const bl10 = parseFloat(a.stats.l10) || 0;
+    const trendA = isPlayoffs
+        ? ah2h + al5
+        : (ah2h + al5 + al10);
+    const trendB = isPlayoffs
+        ? bh2h + bl5
+        : (bh2h + bl5 + bl10);
+        
     let sortTrend = trendB !== trendA ? trendB - trendA : seasonB - seasonA;
 
     switch (sortingType) {
@@ -218,7 +234,7 @@ function sortProps(a, b, sortingType) {
                 : bestOddsA - bestOddsB;
 
         case SortingType.SORT_ODDS:
-            return (bestOddsA !== bestOddsB) ? bestOddsA - bestOddsB : sortTrend
+            return (bestOddsA !== bestOddsB) ? (bestOddsA + (trendA * 100)) - (bestOddsB + (trendB * 100)) : sortTrend
         case SortingType.SORT_TREND:
             return sortTrend
         default:
@@ -337,23 +353,21 @@ function constructVisualizerPayload(filterType, sortingType) {
         .sort((a, b) => sortProps(a, b, sortingType))
         .map(item => mapProps(item, filterType))
         .filter(item => item !== null); // Remove null values
-    return { filteredData };
+    return {
+        filteredData: filteredData,
+        isPlayoffs: isPlayoffs
+    };
 }
 
 function filterProps(item, filterType) {
-    // return marketLabel.includes("Bruce Brown")  && noGoblinProps;
     let outcomeLabel = item.outcome.outcomeLabel;
     let isOver = outcomeLabel == "Over"
     let isUnder = outcomeLabel == "Under"
     const overFilters = new Set([
-        FilterType.FILTER_HIGH_TREND_OVERS,
-        FilterType.FILTER_HIGH_ODDS_OVERS,
         FilterType.FILTER_HIGH_ODDS_HIGH_TREND_OVERS
     ]);
 
     const underFilters = new Set([
-        FilterType.FILTER_HIGH_TREND_UNDERS,
-        FilterType.FILTER_HIGH_ODDS_UNDERS,
         FilterType.FILTER_HIGH_ODDS_HIGH_TREND_UNDERS
     ]);
 
@@ -361,55 +375,44 @@ function filterProps(item, filterType) {
     if (underFilters.has(filterType) && isOver) return false;
 
     let stats = item.stats;
-    let lowTrendProps = stats.l10 <= 0.4 && stats.l5 <= 0.4
-    let midTrendProps = stats.l10 <= 0.4 && stats.l5 <= 0.6
-    let inflatedProps = stats.l10 >= 0.4 && stats.l5 >= 0.8 && isUnder
+    // let lowTrendProps = stats.l10 <= 0.4 && stats.l5 <= 0.4
+    // let midTrendProps = stats.l10 <= 0.4 && stats.l5 <= 0.6
+    // let inflatedProps = stats.l10 >= 0.4 && stats.l5 >= 0.8 && isUnder
     let ppOdds = parseFloat(item.outcome.bookOdds.PRIZEPICKS?.odds);
     let noGoblinProps = ppOdds !== -137
     let averageOdds = getAvgOdds(item)
-    let hasFavorableOdds = averageOdds !== null && averageOdds <= -130;
+    let hasFavorableOdds = averageOdds !== null && averageOdds <= -125;
 
     let highTrendPicks = noGoblinProps
         && (stats.l10 > stats.l20)
         && (stats.l5 > stats.l10 || stats.l10 >= 0.9)
 
     let goblinOdds = averageOdds !== null && averageOdds <= -400
-    let goblinPicks = goblinOdds
-        || (stats.l5 >= (stats.l10 * 0.9)
-            && stats.curSeason >= 0.7
-            && isOver
-        )
+    let goblinPicks = goblinOdds || (
+        stats.l5 >= (stats.l10 * 0.9)
+        && stats.curSeason >= 0.7
+        && isOver
+        && stats.l5 >= 0.8
+        && stats.h2h >= 0.8
+    )
 
+    // Not Locks
     if (
-        lowTrendProps || 
-        inflatedProps || 
-        midTrendProps || 
-        stats.h2h < .5 ||
-        stats.l10 == undefined ||
+        (!isPlayoffs && stats.curSeason < .6) ||
+        stats.h2h < .6 ||
+        stats.l10 < 0.6 ||
+        stats.l5 < .6 ||
         averageOdds >= 100 ||
-        stats.l5 + stats.h2h < 1
-        || stats.curSeason < .5
+        stats.l5 < stats.l10
     ) {
         return false;
     }
 
-    switch (filterType) {
-        case FilterType.FILTER_GOBLINS:
-            return goblinPicks;
-        case FilterType.FILTER_HIGH_TREND_UNDERS:
-        case FilterType.FILTER_HIGH_TREND_OVERS:
-        case FilterType.FILTER_HIGH_TREND:
-            return highTrendPicks;
-        case FilterType.FILTER_HIGH_ODDS_UNDERS:
-        case FilterType.FILTER_HIGH_ODDS_OVERS:
-        case FilterType.FILTER_HIGH_ODDS:
-            return hasFavorableOdds && noGoblinProps;
-        case FilterType.FILTER_HIGH_ODDS_HIGH_TREND_UNDERS:
-        case FilterType.FILTER_HIGH_ODDS_HIGH_TREND_OVERS:
-        case FilterType.FILTER_HIGH_ODDS_HIGH_TREND:
-            return noGoblinProps && (highTrendPicks || hasFavorableOdds)
-        default:
-            return false;
+    // Locks
+    if (showOnlyGoblins) {
+        return goblinPicks;
+    } else {
+        return noGoblinProps && (highTrendPicks || hasFavorableOdds);
     }
 }
 
@@ -422,12 +425,6 @@ const SortingType = {
 
 const FilterType = {
     FILTER_GOBLINS: "FILTER_GOBLINS",
-    FILTER_HIGH_ODDS: "FILTER_HIGH_ODDS",
-    FILTER_HIGH_ODDS_OVERS: "FILTER_HIGH_ODDS_OVERS", // NEW: Show only "Over" props
-    FILTER_HIGH_ODDS_UNDERS: "FILTER_HIGH_ODDS_UNDERS", // NEW: Show only "Under" props
-    FILTER_HIGH_TREND: "FILTER_HIGH_TREND",
-    FILTER_HIGH_TREND_OVERS: "FILTER_HIGH_TREND_OVERS", // NEW: Show only "Over" props
-    FILTER_HIGH_TREND_UNDERS: "FILTER_HIGH_TREND_UNDERS", // NEW: Show only "Under" props
     FILTER_HIGH_ODDS_HIGH_TREND: "FILTER_HIGH_ODDS_HIGH_TREND",
     FILTER_HIGH_ODDS_HIGH_TREND_OVERS: "FILTER_HIGH_ODDS_HIGH_TREND_OVERS",
     FILTER_HIGH_ODDS_HIGH_TREND_UNDERS: "FILTER_HIGH_ODDS_HIGH_TREND_UNDERS",
@@ -436,7 +433,7 @@ const FilterType = {
 pm.visualizer.set(
     template,
     constructVisualizerPayload(
-        FilterType.FILTER_HIGH_ODDS,
+        FilterType.FILTER_HIGH_ODDS_HIGH_TREND,
         SortingType.SORT_ODDS
     )
 );
