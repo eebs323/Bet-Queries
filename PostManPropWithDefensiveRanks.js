@@ -218,7 +218,7 @@ function sortProps(a, b, sortingType) {
     const trendB = isPlayoffs
         ? bh2h + bl5
         : (bh2h + bl5 + bl10);
-        
+
     let sortTrend = trendB !== trendA ? trendB - trendA : seasonB - seasonA;
 
     switch (sortingType) {
@@ -375,42 +375,49 @@ function filterProps(item, filterType) {
     if (underFilters.has(filterType) && isOver) return false;
 
     let stats = item.stats;
-    // let lowTrendProps = stats.l10 <= 0.4 && stats.l5 <= 0.4
-    // let midTrendProps = stats.l10 <= 0.4 && stats.l5 <= 0.6
-    // let inflatedProps = stats.l10 >= 0.4 && stats.l5 >= 0.8 && isUnder
     let ppOdds = parseFloat(item.outcome.bookOdds.PRIZEPICKS?.odds);
     let noGoblinProps = ppOdds !== -137
     let averageOdds = getAvgOdds(item)
     let hasFavorableOdds = averageOdds !== null && averageOdds <= -125;
 
     let highTrendPicks = noGoblinProps
-        && (stats.l10 > stats.l20)
-        && (stats.l5 > stats.l10 || stats.l10 >= 0.9)
+        && (stats.l5 >= stats.l10 || stats.l10 >= 0.8)
 
-    let goblinOdds = averageOdds !== null && averageOdds <= -400
-    let goblinPicks = goblinOdds || (
-        stats.l5 >= (stats.l10 * 0.9)
-        && stats.curSeason >= 0.7
-        && isOver
-        && stats.l5 >= 0.8
-        && stats.h2h >= 0.8
-    )
+    const hasValidStats = stats.h2h != null && stats.l20 != null && stats.l10 != null;
+
+    const goblinOdds =
+        averageOdds !== null &&
+        averageOdds <= -400 &&
+        hasValidStats;
+
+    const goblinPicks =
+        isOver &&
+        hasValidStats &&
+        stats.curSeason >= 0.7 &&
+        stats.l5 >= 0.8 &&
+        stats.h2h >= 0.8;
 
     // Not Locks
-    if (
-        (!isPlayoffs && stats.curSeason < .6) ||
-        stats.h2h < .6 ||
-        stats.l10 < 0.6 ||
-        stats.l5 < .6 ||
-        averageOdds >= 100 ||
-        stats.l5 < stats.l10
-    ) {
-        return false;
+    if (isPlayoffs) {
+        if (stats.h2h < .7 || stats.l5 < .6) {
+            return false
+        }
+    } else {
+        if (
+            stats.curSeason < .6 ||
+            stats.h2h < .8 ||
+            stats.l10 < .6 ||
+            stats.l5 < .6 ||
+            stats.l5 < stats.l10 ||
+            stats.l10 < stats.l20
+        ) {
+            return false;
+        }
     }
 
     // Locks
     if (showOnlyGoblins) {
-        return goblinPicks;
+        return goblinPicks || goblinOdds;
     } else {
         return noGoblinProps && (highTrendPicks || hasFavorableOdds);
     }
