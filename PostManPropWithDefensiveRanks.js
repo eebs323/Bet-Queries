@@ -360,22 +360,31 @@ function constructVisualizerPayload(filterType, sortingType) {
 
 function isSafeRegular(stats) {
     let hits = 0;
+
     if (stats.l20 >= 0.5) hits++;
     if (stats.l10 >= 0.6) hits++;
     if (stats.l5 >= 0.6) hits++;
     if (stats.curSeason >= 0.6) hits++;
-    if (stats.h2h == null || stats.h2h >= 0.60) hits++;
+    if (stats.h2h == null || stats.h2h >= 0.80) hits++;
     else hits--;
+
+    // Add trend analysis
+    if (stats.l5 >= stats.l10 && stats.l10 >= stats.l20) {
+        hits++; // trending up
+    } else if (stats.l5 < stats.l10 && stats.l10 < stats.l20) {
+        hits--; // trending down
+    }
+
     return hits >= 4;
 }
 
 function isSafeGoblin(stats, avgOdds) {
     let hits = 0;
-    if (stats.l20 >= 0.80) hits++;
-    if (stats.l10 >= 0.80) hits++;
-    if (stats.l5 >= 0.80) hits++;
+    if (stats.l20 >= 0.8) hits++;
+    if (stats.l10 >= 0.8) hits++;
+    if (stats.l5 >= 0.8) hits++;
     if (stats.curSeason >= 0.75) hits++;
-    if (stats.h2h == null || stats.h2h >= 0.70) hits++;
+    if (stats.h2h == null || stats.h2h >= 0.7) hits++;
     else hits--;
     return hits >= 4 && avgOdds <= -300;
 }
