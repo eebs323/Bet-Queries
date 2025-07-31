@@ -356,71 +356,54 @@ function constructVisualizerPayload(filterType, sortingType) {
     };
 }
 
-function filterProps(item, filterType) {
-    let outcomeLabel = item.outcome.outcomeLabel;
-    let isOver = outcomeLabel == "Over"
-    let isUnder = outcomeLabel == "Under"
-    const overFilters = new Set([
-        FilterType.FILTER_HIGH_ODDS_HIGH_TREND_OVERS
-    ]);
+function isSafeRegular(stats) {
+    let hits = 0;
+    if (stats.l20 >= 0.5) hits++;
+    if (stats.l10 >= 0.6) hits++;
+    if (stats.l5 >= 0.6) hits++;
+    if (stats.curSeason >= 0.6) hits++;
+    if (stats.h2h == null || stats.h2h >= 0.60) hits++;
+    else hits--;
+    return hits >= 4;
+}
 
-    const underFilters = new Set([
-        FilterType.FILTER_HIGH_ODDS_HIGH_TREND_UNDERS
-    ]);
+function isSafeGoblin(stats, avgOdds) {
+    let hits = 0;
+    if (stats.l20 >= 0.80) hits++;
+    if (stats.l10 >= 0.80) hits++;
+    if (stats.l5 >= 0.80) hits++;
+    if (stats.curSeason >= 0.75) hits++;
+    if (stats.h2h == null || stats.h2h >= 0.70) hits++;
+    else hits--;
+    return hits >= 4 && avgOdds <= -300;
+}
+
+function filterProps(item, filterType) {
+    const outcomeLabel = item.outcome.outcomeLabel;
+    const isOver = outcomeLabel === "Over";
+    const isUnder = outcomeLabel === "Under";
+
+    const overFilters = new Set([FilterType.FILTER_HIGH_ODDS_HIGH_TREND_OVERS]);
+    const underFilters = new Set([FilterType.FILTER_HIGH_ODDS_HIGH_TREND_UNDERS]);
 
     if (overFilters.has(filterType) && isUnder) return false;
     if (underFilters.has(filterType) && isOver) return false;
 
-    let stats = item.stats;
-    let ppOdds = parseFloat(item.outcome.bookOdds.PRIZEPICKS?.odds);
-    let noGoblinProps = ppOdds !== -137
-    let averageOdds = getAvgOdds(item)
-    let hasFavorableOdds = averageOdds !== null && averageOdds <= -125;
-
-    let highTrendPicks = noGoblinProps
-        && (stats.l5 >= stats.l10 || stats.l10 >= 0.8)
-
+    const stats = item.stats;
+    const ppOdds = parseFloat(item.outcome.bookOdds.PRIZEPICKS?.odds);
+    const noGoblinProps = ppOdds !== -137;
+    const avgOdds = getAvgOdds(item);
     const hasValidStats = stats.h2h != null && stats.l10 != null;
 
-    const goblinOdds =
-        averageOdds <= -300 &&
-        (stats.l5 == 1 || stats.h2h == 1) &&
-        stats.curSeason >= .7 &&
-        hasValidStats;
+    const isGoblin = avgOdds <= -300;
 
-    const goblinPicks = 
-        isOver
-        && hasValidStats
-        && stats.curSeason >= 0.8;
-        // &&
-        // stats.l5 >= 0.8 &&
-        // stats.h2h >= 0.8 &&
-        // stats.curSeason >= 0.8;
+    const safeRegular = isOver && noGoblinProps && isSafeRegular(stats);
+    const safeGoblin = isOver && isGoblin && isSafeGoblin(stats, avgOdds);
 
-    // Not Locks
-    if (isPlayoffs) {
-        if (stats.h2h < .7 || stats.l5 < .6) {
-            return false
-        }
-    } else {
-        if (
-            stats.curSeason < .55 ||
-            stats.h2h < .75 ||
-            stats.l10 < .6 ||
-            stats.l5 < .6 ||
-            stats.l5 < stats.l10 ||
-            stats.l10 < stats.l20 ||
-            !hasValidStats
-        ) {
-            return false;
-        }
-    }
-
-    // Locks
     if (showOnlyGoblins) {
-        return goblinPicks || goblinOdds;
+        return safeGoblin;
     } else {
-        return noGoblinProps && (highTrendPicks || hasFavorableOdds);
+        return safeGoblin || safeRegular;
     }
 }
 
