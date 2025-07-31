@@ -286,13 +286,10 @@ function mapProps(item, filterType) {
             defenseClass = "dark-green-text";  // Heavy Favorable matchup
         } else if ((isOver && opponentDefenseRank <= midLow) || (!isOver && opponentDefenseRank >= heavy)) {
             defenseClass = "dark-red-text";  // Heavy Unfavorable matchup
-            // if (filterType != FilterType.FILTER_GOBLINS)
-            // return null;
         } else if ((!isOver && opponentDefenseRank <= midHigh) || (isOver && opponentDefenseRank >= midHigh)) {
             defenseClass = "green-text";  // Medium Favorable matchup
         } else {
             defenseClass = "red-text";  // Medium Unfavorable matchup
-            // return null;
         }
     }
 
@@ -383,19 +380,22 @@ function filterProps(item, filterType) {
     let highTrendPicks = noGoblinProps
         && (stats.l5 >= stats.l10 || stats.l10 >= 0.8)
 
-    const hasValidStats = stats.h2h != null && stats.l20 != null && stats.l10 != null;
+    const hasValidStats = stats.h2h != null && stats.l10 != null;
 
     const goblinOdds =
-        averageOdds !== null &&
-        averageOdds <= -400 &&
+        averageOdds <= -300 &&
+        (stats.l5 == 1 || stats.h2h == 1) &&
+        stats.curSeason >= .7 &&
         hasValidStats;
 
-    const goblinPicks =
-        isOver &&
-        hasValidStats &&
-        stats.curSeason >= 0.7 &&
-        stats.l5 >= 0.8 &&
-        stats.h2h >= 0.8;
+    const goblinPicks = 
+        isOver
+        && hasValidStats
+        && stats.curSeason >= 0.8;
+        // &&
+        // stats.l5 >= 0.8 &&
+        // stats.h2h >= 0.8 &&
+        // stats.curSeason >= 0.8;
 
     // Not Locks
     if (isPlayoffs) {
@@ -404,12 +404,13 @@ function filterProps(item, filterType) {
         }
     } else {
         if (
-            stats.curSeason < .6 ||
-            stats.h2h < .8 ||
+            stats.curSeason < .55 ||
+            stats.h2h < .75 ||
             stats.l10 < .6 ||
             stats.l5 < .6 ||
             stats.l5 < stats.l10 ||
-            stats.l10 < stats.l20
+            stats.l10 < stats.l20 ||
+            !hasValidStats
         ) {
             return false;
         }
