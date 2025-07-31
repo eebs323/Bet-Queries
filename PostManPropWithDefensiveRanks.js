@@ -43,12 +43,13 @@ var template = `
                 <th>H2H</th>
                 {{#unless isPlayoffs}}<th>Szn</th>{{/unless}}
                 {{#unless isPlayoffs}}<th>DRank</th>{{/unless}}
-                <th>AVGODDS</th>
-                <th>FD</th>
+                <th>ODDS</th>
+<!--                 <th>FD</th>
                 <th>DK</th>
                 <th>CSRS</th>
                 <th>365</th>
                 <th>MGM</th>
+-->
             </tr>
         </thead>
         <tbody>
@@ -64,11 +65,12 @@ var template = `
                 {{#unless ../isPlayoffs}}<td class="{{curSeasonColor}}">{{curSeason}}</td>{{/unless}}
                 {{#unless ../isPlayoffs}}<td class="{{defenseClass}}">{{defenseRank}}</td>{{/unless}}
                 <td>{{AVG_ODDS}}</td>
-                <td>{{FANDUEL_odds}}</td>
+<!--                <td>{{FANDUEL_odds}}</td>
                 <td>{{DK_odds}}</td>
                 <td>{{CAESARS_odds}}</td>
                 <td>{{BET365_odds}}</td>
                 <td>{{MGM_odds}}</td>
+-->
             </tr>
             {{/each}}
         </tbody>
@@ -388,7 +390,7 @@ function filterProps(item, filterType) {
 
     if (overFilters.has(filterType) && isUnder) return false;
     if (underFilters.has(filterType) && isOver) return false;
-
+    
     const stats = item.stats;
     const ppOdds = parseFloat(item.outcome.bookOdds.PRIZEPICKS?.odds);
     const noGoblinProps = ppOdds !== -137;
@@ -397,8 +399,8 @@ function filterProps(item, filterType) {
 
     const isGoblin = avgOdds <= -300;
 
-    const safeRegular = isOver && noGoblinProps && isSafeRegular(stats);
-    const safeGoblin = isOver && isGoblin && isSafeGoblin(stats, avgOdds);
+    const safeRegular = noGoblinProps && isSafeRegular(stats);
+    const safeGoblin = isGoblin && isSafeGoblin(stats, avgOdds);
 
     if (showOnlyGoblins) {
         return safeGoblin;
