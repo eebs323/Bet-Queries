@@ -41,7 +41,8 @@ var template = `
                 <th>L10</th>
                 <th>L5</th>
                 <th>H2H</th>
-                {{#unless isPlayoffs}}<th>Szn</th>{{/unless}}
+                {{#unless isPlayoffs}}<th>Szn25</th>{{/unless}}
+                {{#unless isPlayoffs}}<th>Szn24</th>{{/unless}}
                 {{#unless isPlayoffs}}<th>DRank</th>{{/unless}}
                 <th>ODDS</th>
 <!--                 <th>FD</th>
@@ -63,6 +64,7 @@ var template = `
                 <td class="{{l5Color}}">{{l5}}</td>
                 <td class="{{h2hColor}}">{{h2h}}</td>
                 {{#unless ../isPlayoffs}}<td class="{{curSeasonColor}}">{{curSeason}}</td>{{/unless}}
+                {{#unless ../isPlayoffs}}<td class="{{prevSeasonColor}}">{{prevSeason}}</td>{{/unless}}
                 {{#unless ../isPlayoffs}}<td class="{{defenseClass}}">{{defenseRank}}</td>{{/unless}}
                 <td>{{AVG_ODDS}}</td>
 <!--                <td>{{FANDUEL_odds}}</td>
@@ -97,131 +99,280 @@ console.log(`Defensive Stats Key: ${defensiveStats}`);
 console.log(`Entities Key: ${entities}`);
 console.log(`Schedule Data Key: ${schedule}`);
 
-function getTrendColor(value) {
-    if (value >= 0.6) return 'green-text';
-    if (value >= 0.4) return 'orange-text';
-    return 'red-text';
-}
+// ---------- Config ----------
 
-const OFFENSE_PROPS = new Set([
-  "STEALS",
-  "STEALS_BLOCKS",
-  "BLOCKS",
-  "DEFENSIVE_REBOUNDS",
-  "TURNOVERS"
+// Basketball props that should evaluate opponent OFFENSE ranks instead of DEFENSE
+const OFFENSE_PROPS_BASKETBALL = new Set([
+    "STEALS",
+    "STEALS_BLOCKS",
+    "BLOCKS",
+    "DEFENSIVE_REBOUNDS",
+    "TURNOVERS"
 ]);
 
-const STAT_MAP = {
-  // Basketball
-  "POINTS_REBOUNDS_ASSISTS": "points|rebounds|assists",
-  "FANTASY_SCORE_PP": "points|rebounds|assists",
-  "POINTS_REBOUNDS": "points|rebounds",
-  "POINTS_ASSISTS": "points|assists",
-  "REBOUNDS_ASSISTS": "rebounds|assists",
-  "POINTS": "points",
-  "REBOUNDS": "rebounds",
-  "ASSISTS": "assists",
-  "BLOCKS": "blocks",
-  "STEALS": "steals",
-  "STEALS_BLOCKS": "steals|blocks",
-  "TURNOVERS": "turnovers",
-  "THREE_POINTERS": "threePointsMade",
-  "FREE_THROWS": "ftMade",
-  "THREE_POINTERS_ATTEMPTED": "threePointsAtt",
-  "FIELD_GOALS_ATTEMPTED": "twoPointsAtt",
-  "DEFENSIVE_REBOUNDS": "defRebounds",
-  "OFFENSIVE_REBOUNDS": "offRebounds",
-  "MADE_FIELD_GOALS": "fieldGoalPct",
-  "PERSONAL_FOULS": "",
-  // Soccer
-  "SHOTS_ON_GOAL": "shotsOnGoal",
-  "FOULS": "fouls",
-  "GOALS": "goals",
-  "ASSISTS_SOCCER": "assists",
-  "YELLOW_CARDS": "yellowCards",
-  "RED_CARDS": "redCards",
-  "SHOT_ATTEMPTS": "shotAttempts",
-  "DEFENSIVE_TACKLES": "totalTackles",
-  "PASSING_ATTEMPTS": "totalPasses",
-  "SAVES": "saves",
-  "DRIBBLE_ATTEMPTS": "totalDribbleAtt",
-  "CLEARANCES": "totalClearances"
+// Stat maps per league
+const STAT_MAP_BASKETBALL = {
+    "POINTS_REBOUNDS_ASSISTS": "points|rebounds|assists",
+    "FANTASY_SCORE_PP": "points|rebounds|assists",  // special handling below also uses steals|blocks
+    "POINTS_REBOUNDS": "points|rebounds",
+    "POINTS_ASSISTS": "points|assists",
+    "REBOUNDS_ASSISTS": "rebounds|assists",
+    "POINTS": "points",
+    "REBOUNDS": "rebounds",
+    "ASSISTS": "assists",
+    "BLOCKS": "blocks",
+    "STEALS": "steals",
+    "STEALS_BLOCKS": "steals|blocks",
+    "TURNOVERS": "turnovers",
+    "THREE_POINTERS": "threePointsMade",
+    "FREE_THROWS": "ftMade",
+    "THREE_POINTERS_ATTEMPTED": "threePointsAtt",
+    "FIELD_GOALS_ATTEMPTED": "twoPointsAtt",
+    "DEFENSIVE_REBOUNDS": "defRebounds",
+    "OFFENSIVE_REBOUNDS": "offRebounds",
+    "MADE_FIELD_GOALS": "fieldGoalPct",
+    "PERSONAL_FOULS": ""
 };
 
+const STAT_MAP_SOCCER = {
+    "SHOTS_ON_GOAL": "shotsOnGoal",
+    "FOULS": "fouls",
+    "GOALS": "goals",
+    "ASSISTS_SOCCER": "assists",
+    "YELLOW_CARDS": "yellowCards",
+    "RED_CARDS": "redCards",
+    "SHOT_ATTEMPTS": "shotAttempts",
+    "DEFENSIVE_TACKLES": "totalTackles",
+    "PASSING_ATTEMPTS": "totalPasses",
+    "SAVES": "saves",
+    "DRIBBLE_ATTEMPTS": "totalDribbleAtt",
+    "CLEARANCES": "totalClearances"
+};
+
+const STAT_MAP_NFL = {
+    // QB
+    PASSING_YARDS: "passingYards",
+    PASSING_ATTEMPTS: "passingAttempts",
+    PASSING_TDS: "passingTouchdowns",
+    INTERCEPTIONS_THROWN: "interceptionsThrown",
+    PASS_RUSH_YARDS: "passingYards|rushingYards",
+    // RB
+    RUSHING_YARDS: "rushingYards",
+    RUSH_ATTEMPTS: "rushingAttempts",
+    RUSHING_TDS: "rushingTouchdowns",
+    RUSH_REC_YARDS: "rushingYards|receivingYards",
+    // WR TE
+    RECEIVING_YARDS: "receivingYards",
+    RECEPTIONS: "receptions",
+    TARGETS: "recTargets",
+    RECEIVING_TDS: "receivingTouchdowns",
+    // Pressure and situational
+    SACKS_TAKEN: "passerSacks",
+    SACKS: "sacks",
+    QB_HITS: "qbHits",
+    POINTS: "points",
+    TOUCHDOWNS: "touchdowns",
+    REDZONE_EFF: "redzoneEff",
+    THIRD_DOWN_CONV: "thirdDownConv",
+    // Kicking
+    KICKING_POINTS: "kickingPoints",
+    FIELD_GOALS: "fieldGoals",
+    EXTRA_POINTS: "extraPoints"
+};
+
+// League registry
+const LEAGUE_CONFIGS = {
+    NBA: {
+        type: "basketball",
+        seasonEnv: "nbaSeasonYear",
+        defaultYear: "2024",
+        statMap: STAT_MAP_BASKETBALL,
+        offenseProps: OFFENSE_PROPS_BASKETBALL,
+        teamCountFallback: 30,
+        thresholds: { heavy: 20, midHigh: 16, midLow: 10 }  // legacy style
+    },
+    WNBA: {
+        type: "basketball",
+        seasonEnv: "wnbaSeasonYear",
+        defaultYear: "2025",
+        statMap: STAT_MAP_BASKETBALL,
+        offenseProps: OFFENSE_PROPS_BASKETBALL,
+        teamCountFallback: 13,  // auto from data when available
+        thresholds: "dynamic_tertiles"  // use team count dynamic coloring
+    },
+    NFL: {
+        type: "nfl",
+        seasonEnv: "nflSeasonYear",
+        defaultYear: "2024",
+        statMap: STAT_MAP_NFL,
+        offenseProps: new Set(), // NFL always look at opponent defense for player props
+        teamCountFallback: 32,
+        thresholds: { heavy: 24, midHigh: 20, midLow: 12 }
+    },
+    NHL: {
+        type: "hockey",
+        seasonEnv: "nhlSeasonYear",
+        defaultYear: "2024",
+        statMap: STAT_MAP_BASKETBALL, // reuse if your ranks use similar keys, else swap to an NHL map
+        offenseProps: new Set(),
+        teamCountFallback: 32,
+        thresholds: { heavy: 22, midHigh: 17, midLow: 10 }
+    },
+    SOCCER: {
+        type: "soccer",
+        seasonEnv: "soccerSeasonYear",
+        defaultYear: "2024",
+        statMap: STAT_MAP_SOCCER,
+        offenseProps: new Set(),
+        teamCountFallback: 20,
+        thresholds: "dynamic_tertiles"  // per competition team count
+    }
+};
+
+// ---------- Helpers ----------
+
 function findOpponentTeam(playerTeamId, eventId) {
-  const game = schedule?.events?.find(g => g.eventId == eventId);
-  if (!game) return null;
-  if (game?.home?.teamId == null || game?.away?.teamId == null) return "N/A";
-  return playerTeamId == game.home.teamId ? game.away.teamId : game.home.teamId;
+    const game = schedule?.events?.find(g => g.eventId == eventId);
+    if (!game) return null;
+    if (game?.home?.teamId == null || game?.away?.teamId == null) return "N/A";
+    return playerTeamId == game.home.teamId ? game.away.teamId : game.home.teamId;
 }
 
-// Pick a season year. If not found, try the latest available.
-function pickSeason(content, desiredYear) {
-  const seasons = content?.seasons || content?.competitions?.flatMap(c => c.seasons) || [];
-  if (!seasons.length) return null;
-  return seasons.find(s => s.year == desiredYear)
-      || seasons.reduce((a, b) => (+b.year > +a.year ? b : a)); // latest
+function getLeagueConfig(leagueType) {
+    return LEAGUE_CONFIGS[leagueType] || LEAGUE_CONFIGS.NBA;
 }
 
-// Get team node for a given season
+function pickSeasonFromContent(leagueType, content, competitionId, preferredYear) {
+    if (!content) return null;
+    if (leagueType === "SOCCER" && competitionId) {
+        const comp = content.competitions?.find(c => c.competitionId === competitionId);
+        const seasons = comp?.seasons || [];
+        if (!seasons.length) return null;
+        return seasons.find(s => s.year == preferredYear) || latestSeason(seasons);
+    }
+    const seasons = content.seasons || [];
+    if (!seasons.length) return null;
+    return seasons.find(s => s.year == preferredYear) || latestSeason(seasons);
+}
+
+function latestSeason(seasons) {
+    return seasons.reduce((a, b) => (+b.year > +a.year ? b : a));
+}
+
 function getTeamFromSeason(season, teamId) {
-  return season?.teams?.find(t => t.teamId == teamId) || null;
+    return season?.teams?.find(t => t.teamId == teamId) || null;
 }
 
-// Resolve the correct stats array based on sport and prop type
-function pickStatArray(team, propType) {
-  const overall = team?.rankings?.statRankings?.overall;
-  if (!overall) return [];
-  // Basketball leagues share this offense vs defense split
-  if (OFFENSE_PROPS.has(propType)) return overall.offense || [];
-  return overall.defense || [];
+function getStatArrayForLeague(team, league, propType) {
+    const overall = team?.rankings?.statRankings?.overall;
+    if (!overall) return [];
+    if (league.type === "basketball") {
+        // some props invert to opponent offense ranks
+        return league.offenseProps.has(propType) ? (overall.offense || []) : (overall.defense || []);
+    }
+    // NFL, Soccer, Hockey use defense for player props by default
+    return overall.defense || [];
 }
 
-// Find rank for a given stat key inside a stats array
-function findRank(statsArray, statKey) {
-  if (!statKey) return "N/A";
-  const hit = statsArray.find(s => s.stat == statKey);
-  return hit?.rank ?? "N/A";
+function rankForStatKey(stats, key) {
+    if (!key) return "N/A";
+    if (key.includes("|")) {
+        const parts = key.split("|");
+        const vals = parts
+            .map(k => stats.find(s => s.stat === k)?.rank)
+            .filter(v => typeof v === "number");
+        if (!vals.length) return "N/A";
+        return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+    }
+    const hit = stats.find(s => s.stat === key);
+    return typeof hit?.rank === "number" ? hit.rank : "N/A";
 }
 
-// Special average for FANTASY_SCORE_PP
-function fantasyScoreRank(statsArray) {
-  const a = statsArray.find(s => s.stat === "points|rebounds|assists")?.rank;
-  const b = statsArray.find(s => s.stat === "steals|blocks")?.rank;
-  if (a !== undefined && b !== undefined) return Math.round((a + b) / 2);
-  if (a !== undefined) return a;
-  if (b !== undefined) return b;
-  return "N/A";
+function fantasyScoreRankBasketball(stats) {
+    const pra = stats.find(s => s.stat === "points|rebounds|assists")?.rank;
+    const sb = stats.find(s => s.stat === "steals|blocks")?.rank;
+    if (typeof pra === "number" && typeof sb === "number") return Math.round((pra + sb) / 2);
+    if (typeof pra === "number") return pra;
+    if (typeof sb === "number") return sb;
+    return "N/A";
 }
 
+// ---------- Main: unified ranking ----------
 function getOpponentDefenseRanking(playerTeamId, eventId, propType) {
-  const opponentTeamId = findOpponentTeam(playerTeamId, eventId);
-  if (!opponentTeamId) return "N/A";
+    const opponentTeamId = findOpponentTeam(playerTeamId, eventId);
+    if (!opponentTeamId) return "N/A";
 
-  // Season year preference per league
-  const preferredYear =
-    leagueType === "WNBA" ? "2025"
-    : leagueType === "SOCCER" ? "2024"
-    : "2024";
+    const league = getLeagueConfig(leagueType);
+    const envYear = pm.environment.get(league.seasonEnv);
+    const preferredYear = envYear || league.defaultYear;
 
-  // Basketball and most others use defensiveStats.content.seasons
-  // Soccer path uses competitions → seasons
-  const season = pickSeason(defensiveStats.content, preferredYear);
-  if (!season) return "N/A";
+    const season = pickSeasonFromContent(leagueType, defensiveStats?.content, competitionId, preferredYear);
+    if (!season) return "N/A";
 
-  const team = getTeamFromSeason(season, opponentTeamId);
-  if (!team) return "N/A";
+    const team = getTeamFromSeason(season, opponentTeamId);
+    if (!team) return "N/A";
 
-  const statArray = pickStatArray(team, propType);
+    const stats = getStatArrayForLeague(team, league, propType);
 
-  if (propType === "FANTASY_SCORE_PP") {
-    return fantasyScoreRank(statArray);
-  }
+    // Special for basketball fantasy score
+    if (league.type === "basketball" && propType === "FANTASY_SCORE_PP") {
+        return fantasyScoreRankBasketball(stats);
+    }
 
-  const statKey = STAT_MAP[propType] || null;
-  return findRank(statArray, statKey);
+    const statKey =
+        (league.statMap && league.statMap[propType]) ||
+        (STAT_MAP_BASKETBALL[propType]) || // fallback
+        null;
+
+    return rankForStatKey(stats, statKey);
 }
 
+// ---------- Color helper for all leagues ----------
+function defenseClassForRank(rank, isOver, leagueType) {
+    const r = parseFloat(rank);
+    if (isNaN(r)) return "";
+
+    const league = getLeagueConfig(leagueType);
+
+    // Dynamic tertiles for WNBA and Soccer or when asked
+    if (league.thresholds === "dynamic_tertiles") {
+        const teamCount =
+            (defensiveStats?.content && currentSeasonTeamCount(defensiveStats.content, leagueType, competitionId)) ||
+            league.teamCountFallback;
+        const greenMax = Math.ceil(teamCount / 3);
+        const orangeMax = Math.ceil((teamCount * 2) / 3);
+
+        if (isOver) {
+            if (r <= greenMax) return "red-text";
+            if (r <= orangeMax) return "orange-text";
+            return "green-text";
+        } else {
+            if (r <= greenMax) return "green-text";
+            if (r <= orangeMax) return "orange-text";
+            return "red-text";
+        }
+    }
+
+    // Legacy threshold style
+    const { heavy, midHigh, midLow } = league.thresholds || LEAGUE_CONFIGS.NBA.thresholds;
+
+    if ((isOver && r >= heavy) || (!isOver && r <= midLow)) return "dark-green-text";
+    if ((isOver && r <= midLow) || (!isOver && r >= heavy)) return "dark-red-text";
+    if ((!isOver && r <= midHigh) || (isOver && r >= midHigh)) return "green-text";
+    return "red-text";
+}
+
+function currentSeasonTeamCount(content, leagueType, competitionId) {
+    if (leagueType === "SOCCER" && competitionId) {
+        const comp = content.competitions?.find(c => c.competitionId === competitionId);
+        const seasons = comp?.seasons || [];
+        const season = latestSeason(seasons);
+        return season?.teams?.length || 0;
+    }
+    const seasons = content.seasons || [];
+    const season = latestSeason(seasons);
+    return season?.teams?.length || 0;
+}
 
 function sortProps(a, b, sortingType) {
     let bestOddsA = getAvgOdds(a) || -119;
@@ -266,89 +417,84 @@ function sortProps(a, b, sortingType) {
     }
 }
 
-function mapProps(item, filterType) {
-    let l20Color = getTrendColor(parseFloat(item.stats.l20));
-    let l10Color = getTrendColor(parseFloat(item.stats.l10));
-    let l5Color = getTrendColor(parseFloat(item.stats.l5));
-    let h2hColor = getTrendColor(parseFloat(item.stats.h2h));
-    let curSeasonColor = getTrendColor(parseFloat(item.stats.curSeason));
-
-    let isPrizePicks = item.outcome.bookOdds.PRIZEPICKS !== undefined;
-    let isSleeper = item.outcome.bookOdds.SLEEPER !== undefined;
-    let allowedDFS = showPrizePicksOnly ? isPrizePicks :  isPrizePicks || isSleeper;
-    let includeItem = allowedDFS || (item.outcome.periodLabel == "2H" || item.outcome.periodLabel == "4Q");
-
-    // Find opponent team ID
-    let opponentTeamId = findOpponentTeam(item.outcome.teamId, item.outcome.eventId);
-    let opponentTeamName = "Unknown Team";
-
-    if (opponentTeamId) {
-        let opponentTeam = entities.content.teams.find(team => team.team.teamId === opponentTeamId);
-        if (opponentTeam) {
-            opponentTeamName = opponentTeam.team.fullName; // Use full team name
-        }
-    }
-
-    // Get defensive ranking
-    let opponentDefenseRank = getOpponentDefenseRanking(item.outcome.teamId, item.outcome.eventId, item.outcome.proposition);
-
-    // **🚨 Filter out props with "N/A" defense ranking or "Unknown Team" opponent 🚨**
-    if (opponentDefenseRank == "N/A" && opponentTeamName == "Unknown Team") {
-        return null;
-    }
-
-    let isOver = item.outcome.outcomeLabel === "Over";
-    let defenseClass = "";
-    if (opponentDefenseRank != "N/A") {
-        const leagueThresholds = {
-            NBA: { heavy: 20, midHigh: 16, midLow: 10 },
-            NHL: { heavy: 22, midHigh: 17, midLow: 10 },
-            SOCCER: { heavy: 8, medium: 7 },
-            WNBA: { heavy: 5, midHight: 8, midLow: 10 }
-        };
-
-        const { heavy, midHigh, midLow } = leagueThresholds[leagueType] || leagueThresholds["NBA"]; // Default to NBA
-
-        if ((isOver && opponentDefenseRank >= heavy) || (!isOver && opponentDefenseRank <= midLow)) {
-            defenseClass = "dark-green-text";  // Heavy Favorable matchup
-        } else if ((isOver && opponentDefenseRank <= midLow) || (!isOver && opponentDefenseRank >= heavy)) {
-            defenseClass = "dark-red-text";  // Heavy Unfavorable matchup
-        } else if ((!isOver && opponentDefenseRank <= midHigh) || (isOver && opponentDefenseRank >= midHigh)) {
-            defenseClass = "green-text";  // Medium Favorable matchup
-        } else {
-            defenseClass = "red-text";  // Medium Unfavorable matchup
-        }
-    }
-
-    return includeItem
-        ? {
-            player: (isPrizePicks ? 'PP: ' : 'SL: ') +`${item.outcome.marketLabel} vs ${opponentTeamName}`,
-            type: item.outcome.outcomeLabel,
-            line: item.outcome.line,
-            l20: item.stats.l20,
-            l10: item.stats.l10,
-            l5: item.stats.l5,
-            h2h: item.stats.h2h,
-            curSeason: item.stats.curSeason,
-            l20Color,
-            l10Color,
-            l5Color,
-            h2hColor,
-            curSeasonColor,
-            defenseRank: opponentDefenseRank,
-            defenseClass,
-            CAESARS_odds: item.outcome.bookOdds.CAESARS?.odds,
-            FANDUEL_odds: item.outcome.bookOdds.FANDUEL?.odds,
-            DK_odds: item.outcome.bookOdds.DRAFTKINGS?.odds,
-            BET365_odds: item.outcome.bookOdds.BET365?.odds,
-            MGM_odds: item.outcome.bookOdds.BETMGM?.odds,
-            PP_odds: item.outcome.bookOdds.PRIZEPICKS?.odds,
-            UD_odds: item.outcome.bookOdds.UNDERDOG?.odds,
-            SleeperOdds: item.outcome.bookOdds.SLEEPER?.odds,
-            AVG_ODDS: getAvgOdds(item)
-        }
-        : null;
+// Trend colors (0–.39 red, .4–.59 orange, .6–1 green)
+function trendClass(v) {
+    const n = parseFloat(v);
+    if (isNaN(n)) return "";
+    if (n >= 0.6) return "green-text";
+    if (n >= 0.4) return "orange-text";
+    return "red-text";
 }
+
+function mapProps(item, filterType) {
+    const { outcome, stats } = item;
+    const isPrizePicks = outcome.bookOdds.PRIZEPICKS !== undefined;
+    const isSleeper = outcome.bookOdds.SLEEPER !== undefined;
+    const allowedDFS = showPrizePicksOnly ? isPrizePicks : (isPrizePicks || isSleeper);
+    const includeItem = allowedDFS || (outcome.periodLabel == "2H" || outcome.periodLabel == "4Q");
+
+    // Opponent team
+    const opponentTeamId = findOpponentTeam(outcome.teamId, outcome.eventId);
+    let opponentTeamName = "Unknown Team";
+    if (opponentTeamId) {
+        const t = entities.content.teams.find(x => x.team.teamId === opponentTeamId);
+        if (t) opponentTeamName = t.team.fullName;
+    }
+
+    // Defense rank and class (uses your new unified logic)
+    const opponentDefenseRank = getOpponentDefenseRanking(outcome.teamId, outcome.eventId, outcome.proposition);
+    const isOver = outcome.outcomeLabel === "Over";
+    const defenseClass = defenseClassForRank(opponentDefenseRank, isOver, leagueType);
+
+    // If we truly know nothing about opponent, skip
+    if (opponentDefenseRank == "N/A" && opponentTeamName === "Unknown Team") return null;
+
+    // Trend colors
+    const l20Color = trendClass(stats.l20);
+    const l10Color = trendClass(stats.l10);
+    const l5Color = trendClass(stats.l5);
+    const h2hColor = trendClass(stats.h2h);
+    const curSeasonColor = trendClass(stats.curSeason);
+    const prevSeasonColor = trendClass(stats.prevSeason);
+
+    const prefix = isPrizePicks ? "PP: " : (isSleeper ? "SL: " : "");
+
+    return includeItem ? {
+        player: `${prefix}${outcome.marketLabel} vs ${opponentTeamName}`,
+        type: outcome.outcomeLabel,
+        line: outcome.line,
+
+        // raw values
+        l20: stats.l20,
+        l10: stats.l10,
+        l5: stats.l5,
+        h2h: stats.h2h,
+        curSeason: stats.curSeason,
+        prevSeason: stats.prevSeason,
+
+        // classes
+        l20Color,
+        l10Color,
+        l5Color,
+        h2hColor,
+        curSeasonColor,
+        prevSeasonColor,
+        defenseRank: opponentDefenseRank,
+        defenseClass,
+
+        // odds
+        CAESARS_odds: outcome.bookOdds.CAESARS?.odds,
+        FANDUEL_odds: outcome.bookOdds.FANDUEL?.odds,
+        DK_odds: outcome.bookOdds.DRAFTKINGS?.odds,
+        BET365_odds: outcome.bookOdds.BET365?.odds,
+        MGM_odds: outcome.bookOdds.BETMGM?.odds,
+        PP_odds: outcome.bookOdds.PRIZEPICKS?.odds,
+        UD_odds: outcome.bookOdds.UNDERDOG?.odds,
+        SleeperOdds: outcome.bookOdds.SLEEPER?.odds,
+        AVG_ODDS: getAvgOdds(item)
+    } : null;
+}
+
 
 function getAvgOdds(item) {
     let sportsbookOdds = [
@@ -384,7 +530,7 @@ function constructVisualizerPayload(filterType, sortingType) {
 }
 
 function isSafeRegular(stats) {
-    if (stats.curSeason < .54 || stats.h2h == null || stats.h2h < 0.8 || (stats.l5 < stats.l10 || stats.l10 < (stats.l20*.9))) return 0;
+    if (stats.curSeason < .54 || stats.h2h == null || stats.h2h < 0.8 || (stats.l5 < stats.l10 || stats.l10 < (stats.l20 * .9))) return 0;
 
     let hits = 0;
 
