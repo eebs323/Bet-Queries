@@ -87,8 +87,11 @@ let entities = JSON.parse(pm.globals.get(entitiesKey) || "{}");
 let schedule = JSON.parse(pm.globals.get(scheduleKey) || "{}");
 let competitionId = pm.environment.get("competitionId");
 let showOnlyGoblins = pm.environment.get("showOnlyGoblins") === "true";
+let showOnly2ndHalf = pm.environment.get("showOnly2ndHalf") === "true";
+let showPrizePicksOnly = pm.environment.get("showPrizePicksOnly") === "true";
 
 console.log(`showOnlyGoblins: ${showOnlyGoblins}`);
+console.log(`showPrizePicksOnly: ${showPrizePicksOnly}`);
 console.log(`Loaded data for league: ${leagueType}`);
 console.log(`Defensive Stats Key: ${defensiveStats}`);
 console.log(`Entities Key: ${entities}`);
@@ -100,110 +103,129 @@ function getTrendColor(value) {
     return 'red-text';
 }
 
-// Function to find opponent team in a game
+const OFFENSE_PROPS = new Set([
+  "STEALS",
+  "STEALS_BLOCKS",
+  "BLOCKS",
+  "DEFENSIVE_REBOUNDS",
+  "TURNOVERS"
+]);
+
+const STAT_MAP = {
+  // Basketball
+  "POINTS_REBOUNDS_ASSISTS": "points|rebounds|assists",
+  "FANTASY_SCORE_PP": "points|rebounds|assists",
+  "POINTS_REBOUNDS": "points|rebounds",
+  "POINTS_ASSISTS": "points|assists",
+  "REBOUNDS_ASSISTS": "rebounds|assists",
+  "POINTS": "points",
+  "REBOUNDS": "rebounds",
+  "ASSISTS": "assists",
+  "BLOCKS": "blocks",
+  "STEALS": "steals",
+  "STEALS_BLOCKS": "steals|blocks",
+  "TURNOVERS": "turnovers",
+  "THREE_POINTERS": "threePointsMade",
+  "FREE_THROWS": "ftMade",
+  "THREE_POINTERS_ATTEMPTED": "threePointsAtt",
+  "FIELD_GOALS_ATTEMPTED": "twoPointsAtt",
+  "DEFENSIVE_REBOUNDS": "defRebounds",
+  "OFFENSIVE_REBOUNDS": "offRebounds",
+  "MADE_FIELD_GOALS": "fieldGoalPct",
+  "PERSONAL_FOULS": "",
+  // Soccer
+  "SHOTS_ON_GOAL": "shotsOnGoal",
+  "FOULS": "fouls",
+  "GOALS": "goals",
+  "ASSISTS_SOCCER": "assists",
+  "YELLOW_CARDS": "yellowCards",
+  "RED_CARDS": "redCards",
+  "SHOT_ATTEMPTS": "shotAttempts",
+  "DEFENSIVE_TACKLES": "totalTackles",
+  "PASSING_ATTEMPTS": "totalPasses",
+  "SAVES": "saves",
+  "DRIBBLE_ATTEMPTS": "totalDribbleAtt",
+  "CLEARANCES": "totalClearances"
+};
+
 function findOpponentTeam(playerTeamId, eventId) {
-    const game = schedule?.events?.find(game => game.eventId == eventId);
-    if (!game) return null;
-    if (game?.home?.teamId == null || game?.away?.teamId == null) return "N/A"
-    return playerTeamId == game.home.teamId ? game.away.teamId : game.home.teamId;
+  const game = schedule?.events?.find(g => g.eventId == eventId);
+  if (!game) return null;
+  if (game?.home?.teamId == null || game?.away?.teamId == null) return "N/A";
+  return playerTeamId == game.home.teamId ? game.away.teamId : game.home.teamId;
+}
+
+// Pick a season year. If not found, try the latest available.
+function pickSeason(content, desiredYear) {
+  const seasons = content?.seasons || content?.competitions?.flatMap(c => c.seasons) || [];
+  if (!seasons.length) return null;
+  return seasons.find(s => s.year == desiredYear)
+      || seasons.reduce((a, b) => (+b.year > +a.year ? b : a)); // latest
+}
+
+// Get team node for a given season
+function getTeamFromSeason(season, teamId) {
+  return season?.teams?.find(t => t.teamId == teamId) || null;
+}
+
+// Resolve the correct stats array based on sport and prop type
+function pickStatArray(team, propType) {
+  const overall = team?.rankings?.statRankings?.overall;
+  if (!overall) return [];
+  // Basketball leagues share this offense vs defense split
+  if (OFFENSE_PROPS.has(propType)) return overall.offense || [];
+  return overall.defense || [];
+}
+
+// Find rank for a given stat key inside a stats array
+function findRank(statsArray, statKey) {
+  if (!statKey) return "N/A";
+  const hit = statsArray.find(s => s.stat == statKey);
+  return hit?.rank ?? "N/A";
+}
+
+// Special average for FANTASY_SCORE_PP
+function fantasyScoreRank(statsArray) {
+  const a = statsArray.find(s => s.stat === "points|rebounds|assists")?.rank;
+  const b = statsArray.find(s => s.stat === "steals|blocks")?.rank;
+  if (a !== undefined && b !== undefined) return Math.round((a + b) / 2);
+  if (a !== undefined) return a;
+  if (b !== undefined) return b;
+  return "N/A";
 }
 
 function getOpponentDefenseRanking(playerTeamId, eventId, propType) {
-    let opponentTeamId = findOpponentTeam(playerTeamId, eventId);
-    if (!opponentTeamId) return "N/A";
+  const opponentTeamId = findOpponentTeam(playerTeamId, eventId);
+  if (!opponentTeamId) return "N/A";
 
-    let defenseStats;
-    if (leagueType === "SOCCER" && competitionId) {
-        const competition = defensiveStats.content?.competitions?.find(comp => comp.competitionId === competitionId);
-        if (!competition) return "N/A";
+  // Season year preference per league
+  const preferredYear =
+    leagueType === "WNBA" ? "2025"
+    : leagueType === "SOCCER" ? "2024"
+    : "2024";
 
-        const leagueSeason = competition.seasons?.find(season => season.year == '2024');
-        if (!leagueSeason) return "N/A";
+  // Basketball and most others use defensiveStats.content.seasons
+  // Soccer path uses competitions → seasons
+  const season = pickSeason(defensiveStats.content, preferredYear);
+  if (!season) return "N/A";
 
-        const team = leagueSeason.teams?.find(team => team.teamId === opponentTeamId);
-        if (!team) return "N/A";
+  const team = getTeamFromSeason(season, opponentTeamId);
+  if (!team) return "N/A";
 
-        defenseStats = team?.rankings?.statRankings?.overall?.defense || [];
-    } else {
-        const currentSeason = defensiveStats.content?.seasons?.find(season => season.year == '2024');
-        if (!currentSeason) return "N/A";
+  const statArray = pickStatArray(team, propType);
 
-        const team = currentSeason.teams?.find(team => team.teamId == opponentTeamId);
-        if (!team) return "N/A";
+  if (propType === "FANTASY_SCORE_PP") {
+    return fantasyScoreRank(statArray);
+  }
 
-        defenseStats = (
-            propType === "STEALS"
-            || propType === "STEALS_BLOCKS"
-            || propType === "BLOCKS"
-            || propType === "DEFENSIVE_REBOUNDS"
-            || propType === "TURNOVERS"
-        )
-            ? team?.rankings?.statRankings?.overall?.offense
-            : team?.rankings?.statRankings?.overall?.defense
-            || [];
-    }
-
-    // Define stat mappings for Basketball & Soccer
-    const statMap = {
-        // Basketball Stats
-        "POINTS_REBOUNDS_ASSISTS": "points|rebounds|assists",
-        "FANTASY_SCORE_PP": "points|rebounds|assists", // Updated logic below for FANTASY_SCORE_PP
-        "POINTS_REBOUNDS": "points|rebounds",
-        "POINTS_ASSISTS": "points|assists",
-        "REBOUNDS_ASSISTS": "rebounds|assists",
-        "POINTS": "points",
-        "REBOUNDS": "rebounds",
-        "ASSISTS": "assists",
-        "BLOCKS": "blocks",
-        "STEALS": "steals",
-        "STEALS_BLOCKS": "steals|blocks",
-        "TURNOVERS": "turnovers",
-        "THREE_POINTERS": "threePointsMade",
-        "FREE_THROWS": "ftMade",
-        "THREE_POINTERS_ATTEMPTED": "threePointsAtt",
-        "FIELD_GOALS_ATTEMPTED": "twoPointsAtt",
-        "DEFENSIVE_REBOUNDS": "defRebounds",
-        "OFFENSIVE_REBOUNDS": "offRebounds",
-        "MADE_FIELD_GOALS": "fieldGoalPct",
-        "PERSONAL_FOULS": "",
-
-        // Soccer Stats
-        "SHOTS_ON_GOAL": "shotsOnGoal",
-        "FOULS": "fouls",
-        "GOALS": "goals",
-        "ASSISTS_SOCCER": "assists",
-        "YELLOW_CARDS": "yellowCards",
-        "RED_CARDS": "redCards",
-        "SHOT_ATTEMPTS": "shotAttempts",
-        "DEFENSIVE_TACKLES": "totalTackles",
-        "PASSING_ATTEMPTS": "totalPasses",
-        "SAVES": "saves",
-        "DRIBBLE_ATTEMPTS": "totalDribbleAtt",
-        "CLEARANCES": "totalClearances"
-    };
-
-    // If the propType is FANTASY_SCORE_PP, calculate the average rank of "points|rebounds|assists" and "steals|blocks"
-    if (propType === "FANTASY_SCORE_PP") {
-        let primaryStat = defenseStats.find(stat => stat.stat === "points|rebounds|assists")?.rank;
-        let secondaryStat = defenseStats.find(stat => stat.stat === "steals|blocks")?.rank;
-
-        if (primaryStat !== undefined && secondaryStat !== undefined) {
-            return Math.round((primaryStat + secondaryStat) / 2); // Average both values
-        }
-        return primaryStat !== undefined ? primaryStat : secondaryStat !== undefined ? secondaryStat : "N/A";
-    }
-
-    // Normal ranking retrieval for other prop types
-    let statKey = statMap[propType] || null;
-    if (!statKey) return "N/A";
-
-    let ranking = defenseStats.find(stat => stat.stat == statKey)?.rank;
-    return ranking !== undefined ? ranking : "N/A";
+  const statKey = STAT_MAP[propType] || null;
+  return findRank(statArray, statKey);
 }
 
+
 function sortProps(a, b, sortingType) {
-    let bestOddsA = getAvgOdds(a) || 0;
-    let bestOddsB = getAvgOdds(b) || 0;
+    let bestOddsA = getAvgOdds(a) || -119;
+    let bestOddsB = getAvgOdds(b) || -119;
     let seasonA = parseFloat(a.stats.curSeason) || 0;
     let seasonB = parseFloat(b.stats.curSeason) || 0;
     let defenseRankA = parseFloat(getOpponentDefenseRanking(a.outcome.teamId, a.outcome.eventId, a.outcome.proposition)) || 30;
@@ -252,7 +274,9 @@ function mapProps(item, filterType) {
     let curSeasonColor = getTrendColor(parseFloat(item.stats.curSeason));
 
     let isPrizePicks = item.outcome.bookOdds.PRIZEPICKS !== undefined;
-    let includeItem = isPrizePicks;
+    let isSleeper = item.outcome.bookOdds.SLEEPER !== undefined;
+    let allowedDFS = showPrizePicksOnly ? isPrizePicks :  isPrizePicks || isSleeper;
+    let includeItem = allowedDFS || (item.outcome.periodLabel == "2H" || item.outcome.periodLabel == "4Q");
 
     // Find opponent team ID
     let opponentTeamId = findOpponentTeam(item.outcome.teamId, item.outcome.eventId);
@@ -279,7 +303,8 @@ function mapProps(item, filterType) {
         const leagueThresholds = {
             NBA: { heavy: 20, midHigh: 16, midLow: 10 },
             NHL: { heavy: 22, midHigh: 17, midLow: 10 },
-            SOCCER: { heavy: 8, medium: 7 }
+            SOCCER: { heavy: 8, medium: 7 },
+            WNBA: { heavy: 5, midHight: 8, midLow: 10 }
         };
 
         const { heavy, midHigh, midLow } = leagueThresholds[leagueType] || leagueThresholds["NBA"]; // Default to NBA
@@ -297,7 +322,7 @@ function mapProps(item, filterType) {
 
     return includeItem
         ? {
-            player: `${item.outcome.marketLabel} vs ${opponentTeamName}`,
+            player: (isPrizePicks ? 'PP: ' : 'SL: ') +`${item.outcome.marketLabel} vs ${opponentTeamName}`,
             type: item.outcome.outcomeLabel,
             line: item.outcome.line,
             l20: item.stats.l20,
@@ -359,23 +384,20 @@ function constructVisualizerPayload(filterType, sortingType) {
 }
 
 function isSafeRegular(stats) {
+    if (stats.curSeason < .54 || stats.h2h == null || stats.h2h < 0.8 || (stats.l5 < stats.l10 || stats.l10 < (stats.l20*.9))) return 0;
+
     let hits = 0;
 
     if (stats.l20 >= 0.5) hits++;
     if (stats.l10 >= 0.6) hits++;
     if (stats.l5 >= 0.6) hits++;
-    if (stats.curSeason >= 0.6) hits++;
-    if (stats.h2h == null || stats.h2h >= 0.80) hits++;
-    else hits--;
+    if (stats.h2h >= 0.80) hits++;
+    if (stats.curSeason >= 0.55) hits++;
 
-    // Add trend analysis
-    if (stats.l5 >= stats.l10 && stats.l10 >= stats.l20) {
-        hits++; // trending up
-    } else if (stats.l5 < stats.l10 && stats.l10 < stats.l20) {
-        hits--; // trending down
-    }
+    // trending up
+    if (stats.l5 >= stats.l10 && stats.l10 > stats.l20) hits++;
 
-    return hits >= 4;
+    return hits >= 5;
 }
 
 function isSafeGoblin(stats, avgOdds) {
@@ -391,6 +413,7 @@ function isSafeGoblin(stats, avgOdds) {
 
 function filterProps(item, filterType) {
     const outcomeLabel = item.outcome.outcomeLabel;
+    const periodLabel = item.outcome.periodLabel;
     const isOver = outcomeLabel === "Over";
     const isUnder = outcomeLabel === "Under";
 
@@ -399,7 +422,7 @@ function filterProps(item, filterType) {
 
     if (overFilters.has(filterType) && isUnder) return false;
     if (underFilters.has(filterType) && isOver) return false;
-    
+
     const stats = item.stats;
     const ppOdds = parseFloat(item.outcome.bookOdds.PRIZEPICKS?.odds);
     const noGoblinProps = ppOdds !== -137;
@@ -413,6 +436,8 @@ function filterProps(item, filterType) {
 
     if (showOnlyGoblins) {
         return safeGoblin;
+    } else if (showOnly2ndHalf) {
+        return safe2ndHalf;
     } else {
         return safeGoblin || safeRegular;
     }
