@@ -42,7 +42,7 @@ var template = `
                 <th>L5</th>
                 <th>H2H</th>
                 {{#unless isPlayoffs}}<th>Szn25</th>{{/unless}}
-                {{#unless isPlayoffs}}<th>Szn24</th>{{/unless}}
+                {{#unless isPlayoffs}}<th>Szn24</th>{{/unless}} 
                 {{#unless isPlayoffs}}<th>DRank</th>{{/unless}}
                 <th>ODDS</th>
 <!--                 <th>FD</th>
@@ -431,7 +431,7 @@ function mapProps(item, filterType) {
     const isPrizePicks = outcome.bookOdds.PRIZEPICKS !== undefined;
     const isSleeper = outcome.bookOdds.SLEEPER !== undefined;
     const allowedDFS = showPrizePicksOnly ? isPrizePicks : (isPrizePicks || isSleeper);
-    const includeItem = allowedDFS || (outcome.periodLabel == "2H" || outcome.periodLabel == "4Q");
+    const includeItem = allowedDFS || (outcome.periodLabel == "2H" || outcome.periodLabel == "4Q" || outcome.periodLabel == "1Q");
 
     // Opponent team
     const opponentTeamId = findOpponentTeam(outcome.teamId, outcome.eventId);
@@ -530,7 +530,7 @@ function constructVisualizerPayload(filterType, sortingType) {
 }
 
 function isSafeRegular(stats) {
-    if (stats.curSeason < .54 || stats.h2h == null || stats.h2h < 0.8 || (stats.l5 < stats.l10 || stats.l10 < (stats.l20 * .9))) return 0;
+    if (stats.curSeason < .54 || stats.h2h == null || stats.h2h < 0.5 || (stats.l5 < stats.l10 || stats.l10 < (stats.l20 * .9))) return 0;
 
     let hits = 0;
 
