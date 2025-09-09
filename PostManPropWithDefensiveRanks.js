@@ -56,7 +56,7 @@ var template = `
         <tbody>
             {{#each filteredData}}
             <tr>
-                <td>{{player}}</td>
+                <td class="{{favorableColor}}">{{player}}</td>
                 <td>{{type}}</td>
                 <td>{{line}}</td>
                 {{#unless ../isPlayoffs}}<td class="{{l20Color}}">{{l20}}</td>{{/unless}}
@@ -456,6 +456,7 @@ function mapProps(item, filterType) {
     const h2hColor = trendClass(stats.h2h);
     const curSeasonColor = trendClass(stats.curSeason);
     const prevSeasonColor = trendClass(stats.prevSeason);
+    const favorableColor = item.orf === "FAVORABLE" ? "green-text" : "red-text";
 
     const prefix = isPrizePicks ? "PP: " : (isSleeper ? "SL: " : "");
 
@@ -481,6 +482,7 @@ function mapProps(item, filterType) {
         prevSeasonColor,
         defenseRank: opponentDefenseRank,
         defenseClass,
+        favorableColor,
 
         // odds
         CAESARS_odds: outcome.bookOdds.CAESARS?.odds,
