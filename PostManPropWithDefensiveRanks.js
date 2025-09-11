@@ -10,73 +10,121 @@ const CompetitionId = {
 const isPlayoffs = pm.environment.get("isPlayoffs") === "true";
 
 var template = `
-    <style>
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            table-layout: auto;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-            word-break: break-word;
-        }
-        th {
-            background-color: #f4f4f4;
-        }
-        .dark-green-text { color: green; font-weight: bold; }
-        .green-text { color: green; }
-        .dark-red-text { color: red; font-weight: bold; }
-        .red-text { color: red; }
-        .orange-text {color: orange; }
-    </style>
+  <style>
+    /* Scroll container so header can stick and bottom content isn't blocked */
+    .table-wrap {
+      max-height: 80vh;        /* adjust as needed */
+      overflow: auto;
+      position: relative;
+      padding-bottom: 72px;    /* room so last rows aren't covered */
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;   /* if borders glitch, switch to 'separate' + border-spacing: 0 */
+      table-layout: auto;
+    }
+
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+      word-break: break-word;
+      background: #fff;            /* ensures sticky cells cover content underneath */
+    }
+
+    th {
+      background-color: #f4f4f4;
+    }
+
+    /* Sticky header */
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+    }
+
+    /* Optional: pin first column too (uncomment if you want it) */
+    /*
+    thead th:first-child, tbody td:first-child {
+      position: sticky;
+      left: 0;
+      z-index: 4;
+      background: #fff;
+    }
+    */
+
+    /* Extra spacer after the last row as additional safety */
+    tbody::after {
+      content: "";
+      display: block;
+      height: 72px;                /* matches .table-wrap padding-bottom */
+    }
+
+    /* Try to nuke common bottom fade/overlays inside our container */
+    .table-wrap::after,
+    .table-wrap::before {
+      content: none !important;
+      display: none !important;
+    }
+
+    .dark-green-text { color: green; font-weight: bold; }
+    .green-text { color: green; }
+    .dark-red-text { color: red; font-weight: bold; }
+    .red-text { color: red; }
+    .orange-text { color: orange; }
+  </style>
+
+  <div class="table-wrap">
     <table>
-        <thead>
-            <tr>
-                <th>Player</th>
-                <th>Type</th>
-                <th>Line</th>
-                {{#unless isPlayoffs}}<th>L20</th>{{/unless}}
-                <th>L10</th>
-                <th>L5</th>
-                <th>H2H</th>
-                {{#unless isPlayoffs}}<th>Szn25</th>{{/unless}}
-                {{#unless isPlayoffs}}<th>Szn24</th>{{/unless}} 
-                {{#unless isPlayoffs}}<th>DRank</th>{{/unless}}
-                <th>ODDS</th>
-<!--                 <th>FD</th>
-                <th>DK</th>
-                <th>CSRS</th>
-                <th>365</th>
-                <th>MGM</th>
--->
-            </tr>
-        </thead>
-        <tbody>
-            {{#each filteredData}}
-            <tr>
-                <td class="{{favorableColor}}">{{player}}</td>
-                <td>{{type}}</td>
-                <td>{{line}}</td>
-                {{#unless ../isPlayoffs}}<td class="{{l20Color}}">{{l20}}</td>{{/unless}}
-                <td class="{{l10Color}}">{{l10}}</td>
-                <td class="{{l5Color}}">{{l5}}</td>
-                <td class="{{h2hColor}}">{{h2h}}</td>
-                {{#unless ../isPlayoffs}}<td class="{{curSeasonColor}}">{{curSeason}}</td>{{/unless}}
-                {{#unless ../isPlayoffs}}<td class="{{prevSeasonColor}}">{{prevSeason}}</td>{{/unless}}
-                {{#unless ../isPlayoffs}}<td class="{{defenseClass}}">{{defenseRank}}</td>{{/unless}}
-                <td>{{AVG_ODDS}}</td>
-<!--                <td>{{FANDUEL_odds}}</td>
-                <td>{{DK_odds}}</td>
-                <td>{{CAESARS_odds}}</td>
-                <td>{{BET365_odds}}</td>
-                <td>{{MGM_odds}}</td>
--->
-            </tr>
-            {{/each}}
-        </tbody>
+      <thead>
+        <tr>
+          <th>Player</th>
+          <th>Type</th>
+          <th>Line</th>
+          {{#unless isPlayoffs}}<th>L20</th>{{/unless}}
+          <th>L10</th>
+          <th>L5</th>
+          <th>H2H</th>
+          {{#unless isPlayoffs}}<th>Szn25</th>{{/unless}}
+          {{#unless isPlayoffs}}<th>Szn24</th>{{/unless}}
+          {{#unless isPlayoffs}}<th>DRank</th>{{/unless}}
+          <th>ODDS</th>
+          <!--
+          <th>FD</th>
+          <th>DK</th>
+          <th>CSRS</th>
+          <th>365</th>
+          <th>MGM</th>
+          -->
+        </tr>
+      </thead>
+      <tbody>
+        {{#each filteredData}}
+        <tr>
+          <td class="{{favorableColor}}">{{player}}</td>
+          <td>{{type}}</td>
+          <td>{{line}}</td>
+          {{#unless ../isPlayoffs}}<td class="{{l20Color}}">{{l20}}</td>{{/unless}}
+          <td class="{{l10Color}}">{{l10}}</td>
+          <td class="{{l5Color}}">{{l5}}</td>
+          <td class="{{h2hColor}}">{{h2h}}</td>
+          {{#unless ../isPlayoffs}}<td class="{{curSeasonColor}}">{{curSeason}}</td>{{/unless}}
+          {{#unless ../isPlayoffs}}<td class="{{prevSeasonColor}}">{{prevSeason}}</td>{{/unless}}
+          {{#unless ../isPlayoffs}}<td class="{{defenseClass}}">{{defenseRank}}</td>{{/unless}}
+          <td>{{AVG_ODDS}}</td>
+          <!--
+          <td>{{FANDUEL_odds}}</td>
+          <td>{{DK_odds}}</td>
+          <td>{{CAESARS_odds}}</td>
+          <td>{{BET365_odds}}</td>
+          <td>{{MGM_odds}}</td>
+          -->
+        </tr>
+        {{/each}}
+      </tbody>
     </table>
+  </div>
 `;
 
 let leagueType = pm.environment.get("leagueType") || "NBA";
@@ -422,7 +470,7 @@ function trendClass(v) {
     const n = parseFloat(v);
     if (isNaN(n)) return "";
     if (n >= 0.6) return "green-text";
-    if (n >= 0.4) return "orange-text";
+    if (n >= 0.38) return "orange-text";
     return "red-text";
 }
 
@@ -456,12 +504,12 @@ function mapProps(item, filterType) {
     const h2hColor = trendClass(stats.h2h);
     const curSeasonColor = trendClass(stats.curSeason);
     const prevSeasonColor = trendClass(stats.prevSeason);
-    const favorableColor = item.orf === "FAVORABLE" ? "green-text" : "red-text";
+    const favorableColor = trendClass(item.orfScore);
 
     const prefix = isPrizePicks ? "PP: " : (isSleeper ? "SL: " : "");
 
     return includeItem ? {
-        player: `${prefix}${outcome.marketLabel} vs ${opponentTeamName}`,
+        player: `${prefix}${outcome.marketLabel} vs ${opponentTeamName} (${item.orfScore})`,
         type: outcome.outcomeLabel,
         line: outcome.line,
 
@@ -532,7 +580,7 @@ function constructVisualizerPayload(filterType, sortingType) {
 }
 
 function isSafeRegular(stats) {
-    if (stats.curSeason < .54 || stats.h2h == null || stats.h2h < 0.5 || (stats.l5 < stats.l10 || stats.l10 < (stats.l20 * .9))) return 0;
+    if (stats.curSeason < .54 || stats.h2h == null || stats.h2h < 0.2 || (stats.l5 < stats.l10 || stats.l10 < (stats.l20 * .9))) return 0;
 
     let hits = 0;
 
