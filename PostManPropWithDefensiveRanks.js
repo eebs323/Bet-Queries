@@ -506,10 +506,10 @@ function mapProps(item, filterType) {
     const prevSeasonColor = trendClass(stats.prevSeason);
     const favorableColor = trendClass(item.orfScore);
 
-    const prefix = isPrizePicks ? "PP: " : (isSleeper ? "SL: " : "");
+    const playerPrefix = isPrizePicks ? "PP: " : (isSleeper ? "SL: " : "");
 
     return includeItem ? {
-        player: `${prefix}${outcome.marketLabel} vs ${opponentTeamName} (${item.orfScore})`,
+        player: `${playerPrefix}${outcome.marketLabel} vs ${opponentTeamName} (${item.orfScore})`,
         type: outcome.outcomeLabel,
         line: outcome.line,
 
@@ -596,6 +596,18 @@ function isSafeRegular(stats) {
     return hits >= 5;
 }
 
+function isSafeRegularPlayoffs(stats) {
+    if (stats.h2h <= 0.5 || stats.curSeason <= 0.5) return 0;
+
+    let hits = 0;
+
+    if (stats.l10 >= 0.6) hits++;
+    if (stats.l5 >= 0.6) hits++;
+    if (stats.h2h >= 0.6) hits++;
+
+    return hits >= 1;
+}
+
 function isSafeGoblin(stats, avgOdds) {
     let hits = 0;
     if (stats.l20 >= 0.8) hits++;
@@ -628,12 +640,15 @@ function filterProps(item, filterType) {
     const isGoblin = avgOdds <= -300;
 
     const safeRegular = noGoblinProps && isSafeRegular(stats);
+    const safeRegularPlayoffs = noGoblinProps && isSafeRegularPlayoffs(stats);
     const safeGoblin = isGoblin && isSafeGoblin(stats, avgOdds);
 
     if (showOnlyGoblins) {
         return safeGoblin;
     } else if (showOnly2ndHalf) {
         return safe2ndHalf;
+    } else if (isPlayoffs) {
+        return safeRegularPlayoffs;
     } else {
         return safeGoblin || safeRegular;
     }
