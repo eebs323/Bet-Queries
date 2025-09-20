@@ -423,43 +423,96 @@ function currentSeasonTeamCount(content, leagueType, competitionId) {
 }
 
 function sortProps(a, b, sortingType) {
-    let bestOddsA = getAvgOdds(a) || -119;
-    let bestOddsB = getAvgOdds(b) || -119;
-    let seasonA = parseFloat(a.stats.curSeason) || 0;
-    let seasonB = parseFloat(b.stats.curSeason) || 0;
-    let defenseRankA = parseFloat(getOpponentDefenseRanking(a.outcome.teamId, a.outcome.eventId, a.outcome.proposition)) || 30;
-    let defenseRankB = parseFloat(getOpponentDefenseRanking(b.outcome.teamId, b.outcome.eventId, b.outcome.proposition)) || 30;
-    const ah2h = parseFloat(a.stats.h2h) || 0;
-    const al5 = parseFloat(a.stats.l5) || 0;
-    const al10 = parseFloat(a.stats.l10) || 0;
-    const bh2h = parseFloat(a.stats.h2h) || 0;
-    const bl5 = parseFloat(a.stats.l5) || 0;
-    const bl10 = parseFloat(a.stats.l10) || 0;
-    const trendA = isPlayoffs
-        ? ah2h + al5
-        : (ah2h + al5 + al10);
-    const trendB = isPlayoffs
-        ? bh2h + bl5
-        : (bh2h + bl5 + bl10);
+    // ---------- helpers ----------
+    const toNum = (v, fb = 0) => {
+        const n = Number(v);
+        return Number.isFinite(n) ? n : fb;
+    };
+    const cmpAsc = (x, y) => (x === y ? 0 : (x < y ? -1 : 1)); // smaller first
+    const cmpDesc = (x, y) => (x === y ? 0 : (x > y ? -1 : 1)); // larger first
+    const chain = (...diffs) => {
+        for (const d of diffs) if (d !== 0) return d;
+        return 0;
+    };
 
-    let sortTrend = trendB !== trendA ? trendB - trendA : seasonB - seasonA;
+    // ---------- derived values for A ----------
+    const oddsA = toNum(getAvgOdds(a), +Infinity);  // more negative is better; missing = worst
+    const seasonA = toNum(a?.stats?.curSeason, 0);
+    const ah2h = toNum(a?.stats?.h2h, 0);
+    const al5 = toNum(a?.stats?.l5, 0);
+    const al10 = toNum(a?.stats?.l10, 0);
+    const trendA = isPlayoffs ? (ah2h + al5) : (ah2h + al5 + al10);
+    const defA = toNum(getOpponentDefenseRanking(a?.outcome?.teamId, a?.outcome?.eventId, a?.outcome?.proposition), 999); // high fallback = least favorable
+    const orfA = toNum(a?.orfScore, -Infinity); // missing orf = worst
+
+    // ---------- derived values for B ----------
+    const oddsB = toNum(getAvgOdds(b), +Infinity);
+    const seasonB = toNum(b?.stats?.curSeason, 0);
+    const bh2h = toNum(b?.stats?.h2h, 0);   // FIX: use b, not a
+    const bl5 = toNum(b?.stats?.l5, 0);
+    const bl10 = toNum(b?.stats?.l10, 0);
+    const trendB = isPlayoffs ? (bh2h + bl5) : (bh2h + bl5 + bl10);
+    const defB = toNum(getOpponentDefenseRanking(b?.outcome?.teamId, b?.outcome?.eventId, b?.outcome?.proposition), 999);
+    const orfB = toNum(b?.orfScore, -Infinity);
+
+    // ---------- stable final tie-breaker ----------
+    const nameA = String(a?.outcome?.marketLabel || "");
+    const nameB = String(b?.outcome?.marketLabel || "");
+
+    // ---------- common tie-break you already used ----------
+    const trendTie = chain(
+        cmpDesc(trendA, trendB), // higher trend first
+        cmpDesc(seasonA, seasonB) // then better season first
+    );
 
     switch (sortingType) {
         case SortingType.SORT_DEFENSE_RANK:
-            return defenseRankA !== defenseRankB ? defenseRankB - defenseRankA
-                : seasonB !== seasonA
-                    ? seasonB - seasonA
-                    : bestOddsA - bestOddsB;
+            // Larger defense rank = easier matchup first (descending)
+            // Then season (desc), then odds (asc), then name
+            return chain(
+                cmpDesc(defA, defB),
+                cmpDesc(seasonA, seasonB),
+                cmpAsc(oddsA, oddsB),
+                nameA.localeCompare(nameB)
+            );
 
         case SortingType.SORT_SEASON:
-            return seasonB !== seasonA
-                ? seasonB - seasonA
-                : bestOddsA - bestOddsB;
+            // Season (desc), then odds (asc), then trend (desc), then name
+            return chain(
+                cmpDesc(seasonA, seasonB),
+                cmpAsc(oddsA, oddsB),
+                cmpDesc(trendA, trendB),
+                nameA.localeCompare(nameB)
+            );
 
         case SortingType.SORT_ODDS:
-            return (bestOddsA !== bestOddsB) ? (bestOddsA + (trendA * 100)) - (bestOddsB + (trendB * 100)) : sortTrend
+            // Odds (asc: more negative first), then trend (desc), then season (desc), then name
+            return chain(
+                cmpAsc(oddsA, oddsB),
+                cmpDesc(trendA, trendB),
+                cmpDesc(seasonA, seasonB),
+                nameA.localeCompare(nameB)
+            );
+
         case SortingType.SORT_TREND:
-            return sortTrend
+            // Trend (desc), then season (desc), then odds (asc), then name
+            return chain(
+                cmpDesc(trendA, trendB),
+                cmpDesc(seasonA, seasonB),
+                cmpAsc(oddsA, oddsB),
+                nameA.localeCompare(nameB)
+            );
+
+        case SortingType.SORT_FAVORABLE_TREND:
+            // orfScore (desc), then trend (desc), then season (desc), then odds (asc), then name
+            return chain(
+                cmpDesc(orfA, orfB),
+                cmpDesc(trendA, trendB),
+                cmpDesc(seasonA, seasonB),
+                cmpAsc(oddsA, oddsB),
+                nameA.localeCompare(nameB)
+            );
+
         default:
             return 0;
     }
@@ -580,7 +633,7 @@ function constructVisualizerPayload(filterType, sortingType) {
 }
 
 function isSafeRegular(stats) {
-    if (stats.curSeason < .54 || stats.h2h == null || stats.h2h < 0.2 || (stats.l5 < stats.l10 || stats.l10 < (stats.l20 * .9))) return 0;
+    if (stats.curSeason < .54 || stats.h2h == null || stats.h2h < 0.66 || (stats.l5 < stats.l10 || stats.l10 < (stats.l20 * .9))) return 0;
 
     let hits = 0;
 
@@ -596,16 +649,18 @@ function isSafeRegular(stats) {
     return hits >= 5;
 }
 
-function isSafeRegularPlayoffs(stats) {
-    if (stats.h2h <= 0.5 || stats.curSeason <= 0.5) return 0;
+function isSafeRegularPlayoffs(item) {
+    let stats = item.stats;
+    if (stats.l5 < .66 || stats.h2h <= 0.66) return 0;
+    else return true;
 
     let hits = 0;
 
-    if (stats.l10 >= 0.6) hits++;
+    // if (stats.l10 >= 0.6) hits++;
     if (stats.l5 >= 0.6) hits++;
     if (stats.h2h >= 0.6) hits++;
 
-    return hits >= 1;
+    return hits >= 2;
 }
 
 function isSafeGoblin(stats, avgOdds) {
@@ -640,7 +695,7 @@ function filterProps(item, filterType) {
     const isGoblin = avgOdds <= -300;
 
     const safeRegular = noGoblinProps && isSafeRegular(stats);
-    const safeRegularPlayoffs = noGoblinProps && isSafeRegularPlayoffs(stats);
+    const safeRegularPlayoffs = noGoblinProps && isSafeRegularPlayoffs(item);
     const safeGoblin = isGoblin && isSafeGoblin(stats, avgOdds);
 
     if (showOnlyGoblins) {
@@ -658,7 +713,8 @@ const SortingType = {
     SORT_SEASON: "CurSeasonFirst",  // Sort by curSeason → bestOdds
     SORT_ODDS: "SORT_ODDS",    // Sort by bestOdds → curSeason
     SORT_DEFENSE_RANK: "SORT_DEFENSE_RANK", // Sort by opponent defense ranking (Ascending: Easier Matchups First)
-    SORT_TREND: "SORT_TREND"
+    SORT_TREND: "SORT_TREND",
+    SORT_FAVORABLE_TREND: "SORT_FAVORABLE_TREND"
 };
 
 const FilterType = {
