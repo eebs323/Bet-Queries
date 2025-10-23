@@ -83,7 +83,7 @@ var template = `
           <th>Type</th>
           <th>Line</th>
           {{#unless isPlayoffs}}<th>L20</th>{{/unless}}
-          <th>L10</th>
+          {{#unless isPlayoffs}}<th>L10</th>{{/unless}}
           <th>L5</th>
           <th>H2H</th>
           {{#unless isPlayoffs}}<th>Szn25</th>{{/unless}}
@@ -106,7 +106,7 @@ var template = `
           <td>{{type}}</td>
           <td>{{line}}</td>
           {{#unless ../isPlayoffs}}<td class="{{l20Color}}">{{l20}}</td>{{/unless}}
-          <td class="{{l10Color}}">{{l10}}</td>
+          {{#unless ../isPlayoffs}}<td class="{{l10Color}}">{{l10}}</td>{{/unless}}
           <td class="{{l5Color}}">{{l5}}</td>
           <td class="{{h2hColor}}">{{h2h}}</td>
           {{#unless ../isPlayoffs}}<td class="{{curSeasonColor}}">{{curSeason}}</td>{{/unless}}
@@ -651,16 +651,8 @@ function isSafeRegular(stats) {
 
 function isSafeRegularPlayoffs(item) {
     let stats = item.stats;
-    if (stats.l5 < .66 || stats.h2h <= 0.66) return 0;
+    if (stats.l5 < .6 || stats.h2h <= .6) return false;
     else return true;
-
-    let hits = 0;
-
-    // if (stats.l10 >= 0.6) hits++;
-    if (stats.l5 >= 0.6) hits++;
-    if (stats.h2h >= 0.6) hits++;
-
-    return hits >= 2;
 }
 
 function isSafeGoblin(stats, avgOdds) {
@@ -672,6 +664,22 @@ function isSafeGoblin(stats, avgOdds) {
     if (stats.h2h == null || stats.h2h >= 0.7) hits++;
     else hits--;
     return hits >= 4 && avgOdds <= -300;
+}
+
+function isSafeGoblinPlayoffs(item) {
+    let stats = item.stats;
+    if (stats.l5 < .6 || stats.h2h < .9) return false;
+    else return true;
+}
+
+function isSafe2ndHalf(stats, periodLabel) {
+    if (periodLabel == "2H" || periodLabel == "4Q" || periodLabel == "1Q") {
+        return true;
+        // let hits = 0;
+        // if (stats.l5 >= 0.6) hits++;
+        // if (stats.h2h == null || stats.h2h >= 0.7) hits++;
+        // return hits >= 2;
+    } else { return false; }
 }
 
 function filterProps(item, filterType) {
@@ -697,13 +705,14 @@ function filterProps(item, filterType) {
     const safeRegular = noGoblinProps && isSafeRegular(stats);
     const safeRegularPlayoffs = noGoblinProps && isSafeRegularPlayoffs(item);
     const safeGoblin = isGoblin && isSafeGoblin(stats, avgOdds);
+    const safe2ndHalf = noGoblinProps && isSafe2ndHalf(stats, periodLabel);
 
     if (showOnlyGoblins) {
         return safeGoblin;
     } else if (showOnly2ndHalf) {
-        return safe2ndHalf;
+        return safeGoblin || safe2ndHalf;
     } else if (isPlayoffs) {
-        return safeRegularPlayoffs;
+        return (isSafeGoblinPlayoffs && isGoblin) || safeRegularPlayoffs;
     } else {
         return safeGoblin || safeRegular;
     }
