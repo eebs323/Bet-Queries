@@ -570,6 +570,10 @@ const CompetitionId = {
   
   // ---------- Filters ----------
   function filterProps(item, filterType) {
+    const isPrizePicks = item.outcome.bookOdds.PRIZEPICKS !== undefined;
+    const isSleeper    = item.outcome.bookOdds.SLEEPER   !== undefined;
+    if (showPrizePicksOnly && !isPrizePicks) return false;
+
     const outcomeLabel = item.outcome.outcomeLabel;
     const periodLabel  = item.outcome.periodLabel;
     const isOver  = outcomeLabel === "Over";
