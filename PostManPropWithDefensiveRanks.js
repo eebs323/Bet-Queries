@@ -879,14 +879,16 @@ const CompetitionId = {
   
   // Partition slips into unique distribution and duplicates (across slips)
   // + filter rule: in DUPES, DO NOT include 2-pick slips with two Goblins
+  // + NEW: cap each player's appearances in the DUPES list to maxDupesPerPlayer (default 2)
   function partitionSlipsUnique(slips) {
     const used = new Set();
     const unique = [];
     let dupes = [];
-  
+
     const slipHasDup = (legs) => legs.some(l => used.has(l.playerKey));
     const addLegs = (legs) => legs.forEach(l => used.add(l.playerKey));
-  
+
+    // First pass: split into unique vs dupes buckets
     for (const s of slips) {
       if (slipHasDup(s.legs)) {
         dupes.push(s);
@@ -895,17 +897,42 @@ const CompetitionId = {
         addLegs(s.legs);
       }
     }
-  
+
     // Filter: no 2-man with 2 Goblins in DUPES
     dupes = dupes.filter(s => {
       if (s.size !== 2) return true;
       const allGoblins = s.legs.every(l => l.approvalTag === "✅ Goblin");
       return !allGoblins; // keep only if NOT both goblins
     });
-  
-    // Cap duplicate list
-    return { unique, dupes: dupes.slice(0, MAX_DUPLICATE_SLIPS) };
-  }
+
+    // NEW — cap the number of DUPES slips any single player can appear in
+    const perPlayerCap = Number(pm.environment.get("maxDupesPerPlayer")) || 2;
+    const appearances = Object.create(null);
+    const cappedDupes = [];
+
+    for (const slip of dupes) {
+      // Would adding this slip exceed the cap for any leg?
+      const wouldExceed = slip.legs.some(leg => {
+        const k = leg.playerKey;
+        const current = appearances[k] || 0;
+        return current >= perPlayerCap;
+      });
+
+      if (wouldExceed) continue;
+
+      // Accept slip and update counts
+      cappedDupes.push(slip);
+      for (const leg of slip.legs) {
+        const k = leg.playerKey;
+        appearances[k] = (appearances[k] || 0) + 1;
+      }
+    }
+
+    // Respect overall max duplicate slips
+    const MAX_DUPLICATE_SLIPS = Number(pm.environment.get("maxDuplicateSlips")) || 10;
+    return { unique, dupes: cappedDupes.slice(0, MAX_DUPLICATE_SLIPS) };
+}
+
   
   // ---------- Constants ----------
   const SortingType = {
