@@ -1,4 +1,4 @@
-// PostManPropWithDefensiveRanks + ALL Regular 2-pick slips + Mega slip (6→5→4→3)
+// PostManPropWithDefensiveRanks + Unique/Duplicate slip rows
 
 // ---------- Leagues ----------
 const CompetitionId = {
@@ -36,6 +36,7 @@ const CompetitionId = {
       .legs { margin: 0; padding-left: 18px; }
       .legs li { margin: 4px 0; }
       .pill { display:inline-block; font-size: 11px; padding: 2px 6px; border-radius: 999px; border:1px solid #ddd; margin-left:6px;}
+      .row-title { margin: 18px 0 6px; font-weight: 700; font-size: 14px; }
     </style>
   
     <div class="table-wrap">
@@ -81,29 +82,56 @@ const CompetitionId = {
       </table>
     </div>
   
-    {{#if slips.length}}
-    <div class="cards">
-      {{#each slips}}
-      <div class="card">
-        <h3>{{title}}</h3>
-        <div class="meta">
-          Est. hit prob: <strong>{{pctWin}}%</strong>
-          <span class="pill">{{size}}-pick</span>
-          <span class="pill">{{bucket}}</span>
-          <span class="pill">Sort: {{sortBasis}}</span>
+    {{#if slipsUnique.length}}
+      <div class="row-title">Recommended slips — Unique player distribution (no repeats across slips)</div>
+      <div class="cards">
+        {{#each slipsUnique}}
+        <div class="card">
+          <h3>{{title}}</h3>
+          <div class="meta">
+            Est. hit prob: <strong>{{pctWin}}%</strong>
+            <span class="pill">{{size}}-pick</span>
+            <span class="pill">{{bucket}}</span>
+            <span class="pill">Sort: {{sortBasis}}</span>
+          </div>
+          <ol class="legs">
+            {{#each legs}}
+              <li>
+                {{player}} — <em>{{type}}</em> {{periodLabel}}, line {{line}}
+                <div class="meta">{{approvalTag}} · {{edgeNote}}</div>
+              </li>
+            {{/each}}
+          </ol>
+          {{#if why}}<div class="meta"><strong>Why:</strong> {{why}}</div>{{/if}}
         </div>
-        <ol class="legs">
-          {{#each legs}}
-            <li>
-              {{player}} — <em>{{type}}</em> {{periodLabel}}, line {{line}}
-              <div class="meta">{{approvalTag}} · {{edgeNote}}</div>
-            </li>
-          {{/each}}
-        </ol>
-        {{#if why}}<div class="meta"><strong>Why:</strong> {{why}}</div>{{/if}}
+        {{/each}}
       </div>
-      {{/each}}
-    </div>
+    {{/if}}
+  
+    {{#if slipsDupes.length}}
+      <div class="row-title">Recommended slips — With duplicate players (monitor exposure)</div>
+      <div class="cards">
+        {{#each slipsDupes}}
+        <div class="card">
+          <h3>{{title}}</h3>
+          <div class="meta">
+            Est. hit prob: <strong>{{pctWin}}%</strong>
+            <span class="pill">{{size}}-pick</span>
+            <span class="pill">{{bucket}}</span>
+            <span class="pill">Sort: {{sortBasis}}</span>
+          </div>
+          <ol class="legs">
+            {{#each legs}}
+              <li>
+                {{player}} — <em>{{type}}</em> {{periodLabel}}, line {{line}}
+                <div class="meta">{{approvalTag}} · {{edgeNote}}</div>
+              </li>
+            {{/each}}
+          </ol>
+          {{#if why}}<div class="meta"><strong>Why:</strong> {{why}}</div>{{/if}}
+        </div>
+        {{/each}}
+      </div>
     {{/if}}
   `;
   
@@ -516,9 +544,13 @@ const CompetitionId = {
     const edgeNote = edgeNoteFor(outcome, raw || {}, avgOdds);
     const edgeGapPct = edgeGapFor(outcome, raw || {}, avgOdds); // numeric for sorting/slips
   
+    // normalized player key (strip trailing "(orfScore)")
+    const playerKey = `${outcome.marketLabel}`.replace(/\s+\(.+?\)$/, "");
+  
     return includeItem ? {
       // display
       player: `${playerPrefix}${outcome.marketLabel} vs ${opponentTeamName} (${item.orfScore})`,
+      playerKey, // used to detect duplicates across slips
       type: outcome.outcomeLabel,
       periodLabel,
       line: outcome.line,
@@ -573,7 +605,7 @@ const CompetitionId = {
     const isPrizePicks = item.outcome.bookOdds.PRIZEPICKS !== undefined;
     const isSleeper    = item.outcome.bookOdds.SLEEPER   !== undefined;
     if (showPrizePicksOnly && !isPrizePicks) return false;
-
+  
     const outcomeLabel = item.outcome.outcomeLabel;
     const periodLabel  = item.outcome.periodLabel;
     const isOver  = outcomeLabel === "Over";
@@ -613,7 +645,7 @@ const CompetitionId = {
   function uniqueByPlayer(arr) {
     const seen = new Set();
     return arr.filter(r => {
-      const key = r.player.replace(/\s+\(.+?\)$/,'');
+      const key = r.playerKey;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -629,20 +661,16 @@ const CompetitionId = {
     return out;
   }
   
-  // Favorable mix scorer:
-  // + weight for opposite Over/Under, + different teams, + different periods,
-  // + sum of positive gaps, with small tie-busters on higher min-gap.
+  // Favorable mix scorer
   function pairScore(a, b) {
     let score = 0;
     const gapA = Number(a.edgeGapPct ?? -999), gapB = Number(b.edgeGapPct ?? -999);
     if (gapA > 0) score += gapA;
     if (gapB > 0) score += gapB;
-    // diversity bonuses
-    if ((a._isOver ^ b._isOver) === 1) score += 5;             // Opposite sides
+    if ((a._isOver ^ b._isOver) === 1) score += 5;                  // Opposite sides
     if (a._teamId && b._teamId && a._teamId !== b._teamId) score += 2; // Different teams
-    if (a.periodLabel !== b.periodLabel) score += 1;           // Different period
-    // encourage not-too-unbalanced pairs
-    score += Math.min(gapA, gapB) * 0.1;
+    if (a.periodLabel !== b.periodLabel) score += 1;                // Different period
+    score += Math.min(gapA, gapB) * 0.1;                            // balance
     return score;
   }
   
@@ -657,13 +685,11 @@ const CompetitionId = {
     const regularsPos = rows
       .filter(r => r.approvalTag === "✅ Regular" && typeof r.edgeGapPct === "number" && r.edgeGapPct > 0);
   
-    // Unique by player, then generate pairs and score for mix
     const uniq = uniqueByPlayer(regularsPos);
     const pairs = combinations2(uniq)
       .map(([a,b]) => ({ legs:[a,b], score: pairScore(a,b) }))
       .sort((x,y) => y.score - x.score);
   
-    // Convert to slip cards; optionally cap to keep UI sane
     const maxPairs = MAX_REGULAR_PAIRS;
     const out = [];
     for (let i=0; i<pairs.length && i<maxPairs; i++) {
@@ -683,8 +709,6 @@ const CompetitionId = {
     return out;
   }
   
-  // Build one mega slip (prefer 6; fallback to 5→4→3) using strongest positive gaps,
-  // mixing Goblins and Regulars and enforcing unique players.
   function buildMegaSlip(rows) {
     const positives = uniqueByPlayer(
       rows.filter(r => typeof r.edgeGapPct==="number" && r.edgeGapPct>0)
@@ -693,29 +717,24 @@ const CompetitionId = {
   
     if (positives.length === 0) return null;
   
-    // Try to assemble with diversity: aim for 6 with at least 2 Goblins + 2 Regulars if possible
     const goblins  = positives.filter(r => r.approvalTag === "✅ Goblin");
     const regulars = positives.filter(r => r.approvalTag === "✅ Regular");
   
     let legs = [];
-    // Seed with up to 3 goblins and up to 3 regulars first
     legs.push(...goblins.slice(0,3));
     for (const r of regulars) {
       if (legs.length >= 6) break;
-      // avoid duplicate team + period + side if possible
       if (!legs.find(x => x._teamId===r._teamId && x.periodLabel===r.periodLabel && x._isOver===r._isOver)) {
         legs.push(r);
       }
     }
-    // Top off with remaining positives if needed
     for (const x of positives) {
       if (legs.length >= 6) break;
-      if (!legs.find(y => y.player.replace(/\s+\(.+?\)$/,'') === x.player.replace(/\s+\(.+?\)$/,''))) {
+      if (!legs.find(y => y.playerKey === x.playerKey)) {
         legs.push(x);
       }
     }
   
-    // Fallback sizes if we couldn't reach 6
     const targetSizes = [6,5,4,3];
     let chosenSize = targetSizes.find(sz => legs.length >= sz);
     legs = legs.slice(0, chosenSize);
@@ -724,7 +743,7 @@ const CompetitionId = {
     const pWin = pEsts.length===legs.length ? product(pEsts) : null;
   
     return {
-      title: "Mega Slip (auto) ",
+      title: "Mega Slip (auto)",
       size: chosenSize,
       bucket: "Mixed",
       sortBasis: "Largest positive Edge Gaps",
@@ -754,7 +773,7 @@ const CompetitionId = {
       });
     }
   
-    // Mixed Trio (3-pick): top 2 Goblins + best Regular
+    // Mixed Trio (3-pick)
     const reg1 = topByGap(rows.filter(r => r.approvalTag==="✅ Regular"), 1);
     if (core2.length === 2 && reg1.length === 1) {
       const trio = uniqueByPlayer([...core2, ...reg1]).slice(0,3);
@@ -773,15 +792,35 @@ const CompetitionId = {
       }
     }
   
-    // NEW: ALL Regular Value (2-pick) slips with favorable mix among positive gaps
+    // ALL Regular Value (2-pick)
     const allRegPairs = buildAllRegularPairs(rows);
     slips.push(...allRegPairs);
   
-    // NEW: Mega Slip (6→5→4→3)
+    // Mega Slip (6→5→4→3)
     const mega = buildMegaSlip(rows);
     if (mega) slips.push(mega);
   
     return slips;
+  }
+  
+  // Partition slips into unique distribution and duplicates (across slips)
+  function partitionSlipsUnique(slips) {
+    const used = new Set();
+    const unique = [];
+    const dupes = [];
+  
+    const slipHasDup = (legs) => legs.some(l => used.has(l.playerKey));
+    const addLegs = (legs) => legs.forEach(l => used.add(l.playerKey));
+  
+    for (const s of slips) {
+      if (slipHasDup(s.legs)) {
+        dupes.push(s);
+      } else {
+        unique.push(s);
+        addLegs(s.legs);
+      }
+    }
+    return { unique, dupes };
   }
   
   // ---------- Constants ----------
@@ -811,12 +850,18 @@ const CompetitionId = {
         .map(item => mapProps(item, filterType))
         .filter(item => item !== null);
   
-      const slips = buildRecommendedSlips(rows);
+      const allSlips = buildRecommendedSlips(rows);
+      const parts = partitionSlipsUnique(allSlips);
   
-      return { filteredData: rows, isPlayoffs: isPlayoffs, slips };
+      return {
+        filteredData: rows,
+        isPlayoffs: isPlayoffs,
+        slipsUnique: parts.unique,
+        slipsDupes: parts.dupes
+      };
     })(
       FilterType.FILTER_HIGH_ODDS_HIGH_TREND,
-      SortingType.SORT_EDGE_GAP // default sort = highest positive Edge Gap first
+      SortingType.SORT_EDGE_GAP // default = highest positive Edge Gap first
     )
   );
   
