@@ -1,4 +1,4 @@
-// PostManPropWithDefensiveRanks (with Period, Approval tag, Edge note w/ implied prob gap)
+// PostManPropWithDefensiveRanks (with Period, Approval tag, Edge note w/ implied prob gap, and SORT_EDGE_GAP)
 
 const CompetitionId = {
     GBR_EPL: "GBR_EPL",
@@ -414,6 +414,64 @@ const CompetitionId = {
     };
   }
   
+  // ---------- Trend color ----------
+  function trendClass(v) {
+    const n = parseFloat(v);
+    if (isNaN(n)) return "";
+    if (n >= 0.6) return "green-text";
+    if (n >= 0.38) return "orange-text";
+    return "red-text";
+  }
+  
+  // ---------- Edge helpers (with implied vs estimated probability) ----------
+  function americanToProb(odds) {
+    const o = Number(odds);
+    if (!Number.isFinite(o)) return null;
+    return (o < 0) ? (-o / (-o + 100)) : (100 / (o + 100));
+  }
+  function pickWindowAndPEst(outcome, rawStats) {
+    const windows = [
+      ["L5",  rawStats?.l5],
+      ["L10", rawStats?.l10],
+      ["H2H", rawStats?.h2h],
+      ["Szn25", rawStats?.curSeason],
+      ["Szn24", rawStats?.prevSeason],
+    ].filter(([,v]) => Number.isFinite(Number(v)));
+  
+    if (!windows.length) return null;
+  
+    const isOver = outcome.outcomeLabel === "Over";
+    const chosen = isOver
+      ? windows.reduce((a,b) => (+b[1] > +a[1] ? b : a))
+      : windows.reduce((a,b) => (+b[1] < +a[1] ? b : a));
+  
+    const pOver = Math.max(0, Math.min(1, Number(chosen[1])));
+    const pEst  = isOver ? pOver : (1 - pOver);
+  
+    return { label: chosen[0], value: Number(chosen[1]), pEst };
+  }
+  // Edge note WITHOUT "vs line ..." (line already shown in Player column)
+  function edgeNoteFor(outcome, rawStats, avgOdds) {
+    const pick = pickWindowAndPEst(outcome, rawStats);
+    if (!pick) return "";
+  
+    const pImp = americanToProb(avgOdds);
+    const base = `${pick.label} ${pick.value.toFixed(2)}`; // removed line text
+  
+    if (pImp == null) return base;
+  
+    const gap = (pick.pEst - pImp) * 100;
+    return `${base} (p_est ${(pick.pEst*100).toFixed(0)}% vs p_imp ${(pImp*100).toFixed(0)}% ⇒ ${gap >= 0 ? "+" : ""}${gap.toFixed(0)}%)`;
+  }
+  // Numeric Edge Gap in percentage points (p_est - p_imp), e.g., +16 or -3
+  function edgeGapFor(outcome, rawStats, avgOdds) {
+    const pick = pickWindowAndPEst(outcome, rawStats);
+    if (!pick) return null;
+    const pImp = americanToProb(avgOdds);
+    if (pImp == null) return null;
+    return (pick.pEst - pImp) * 100;
+  }
+  
   // ---------- Sorting ----------
   function sortProps(a, b, sortingType) {
     const toNum  = (v, fb = 0) => { const n = Number(v); return Number.isFinite(n) ? n : fb; };
@@ -477,18 +535,33 @@ const CompetitionId = {
           cmpAsc(oddsA, oddsB),
           nameA.localeCompare(nameB)
         );
+      case SortingType.SORT_EDGE_GAP: {
+        // Highest positive Edge Gap first; negatives next; nulls at bottom
+        const gapA_raw = (typeof a?.edgeGapPct !== "undefined" && a?.edgeGapPct !== null)
+          ? Number(a.edgeGapPct)
+          : edgeGapFor(a?.outcome, a?.stats, getAvgOdds(a));
+        const gapB_raw = (typeof b?.edgeGapPct !== "undefined" && b?.edgeGapPct !== null)
+          ? Number(b.edgeGapPct)
+          : edgeGapFor(b?.outcome, b?.stats, getAvgOdds(b));
+  
+        const posA = Number.isFinite(gapA_raw) ? (gapA_raw >= 0 ? 2 : 1) : 0;
+        const posB = Number.isFinite(gapB_raw) ? (gapB_raw >= 0 ? 2 : 1) : 0;
+  
+        const gapA = Number.isFinite(gapA_raw) ? gapA_raw : -Infinity;
+        const gapB = Number.isFinite(gapB_raw) ? gapB_raw : -Infinity;
+  
+        return chain(
+          cmpDesc(posA, posB),       // positives → negatives → nulls
+          cmpDesc(gapA, gapB),       // larger edge first
+          cmpDesc(trendA, trendB),   // then trend
+          cmpDesc(seasonA, seasonB), // then season quality
+          cmpAsc(oddsA, oddsB),      // then price (more negative first)
+          nameA.localeCompare(nameB) // final tie-break
+        );
+      }
       default:
         return 0;
     }
-  }
-  
-  // ---------- Trend color ----------
-  function trendClass(v) {
-    const n = parseFloat(v);
-    if (isNaN(n)) return "";
-    if (n >= 0.6) return "green-text";
-    if (n >= 0.38) return "orange-text";
-    return "red-text";
   }
   
   // ---------- Approval tag ----------
@@ -503,49 +576,6 @@ const CompetitionId = {
     if (noGoblin && (isPlayoffs ? isSafeRegularPlayoffs(item) : isSafeRegular(blended))) return "✅ Regular";
     return "⚠ Trend mismatch";
   }
-  
-  // ---------- Edge helpers (with implied vs estimated probability) ----------
-  function americanToProb(odds) {
-    const o = Number(odds);
-    if (!Number.isFinite(o)) return null;
-    return (o < 0) ? (-o / (-o + 100)) : (100 / (o + 100));
-  }
-  function pickWindowAndPEst(outcome, rawStats) {
-    const windows = [
-      ["L5",  rawStats?.l5],
-      ["L10", rawStats?.l10],
-      ["H2H", rawStats?.h2h],
-      ["Szn25", rawStats?.curSeason],
-      ["Szn24", rawStats?.prevSeason],
-    ].filter(([,v]) => Number.isFinite(Number(v)));
-  
-    if (!windows.length) return null;
-  
-    const isOver = outcome.outcomeLabel === "Over";
-    const chosen = isOver
-      ? windows.reduce((a,b) => (+b[1] > +a[1] ? b : a))
-      : windows.reduce((a,b) => (+b[1] < +a[1] ? b : a));
-  
-    const pOver = Math.max(0, Math.min(1, Number(chosen[1])));
-    const pEst  = isOver ? pOver : (1 - pOver);
-  
-    return { label: chosen[0], value: Number(chosen[1]), pEst };
-  }
-
-  // Improved Edge note WITHOUT "vs line ..." (line already shown in Player column)
-  function edgeNoteFor(outcome, rawStats, avgOdds) {
-    const pick = pickWindowAndPEst(outcome, rawStats);
-    if (!pick) return "";
-
-    const pImp = americanToProb(avgOdds);
-    const base = `${pick.label} ${pick.value.toFixed(2)}`; // removed "vs line ${outcome.line}"
-
-    if (pImp == null) return base;
-
-    const gap = (pick.pEst - pImp) * 100;
-    return `${base} (p_est ${(pick.pEst*100).toFixed(0)}% vs p_imp ${(pImp*100).toFixed(0)}% ⇒ ${gap >= 0 ? "+" : ""}${gap.toFixed(0)}%)`;
-  }
-  
   
   // ---------- Map props (adds Period, Approval, Edge) ----------
   function mapProps(item, filterType) {
@@ -707,7 +737,8 @@ const CompetitionId = {
     SORT_ODDS: "SORT_ODDS",
     SORT_DEFENSE_RANK: "SORT_DEFENSE_RANK",
     SORT_TREND: "SORT_TREND",
-    SORT_FAVORABLE_TREND: "SORT_FAVORABLE_TREND"
+    SORT_FAVORABLE_TREND: "SORT_FAVORABLE_TREND",
+    SORT_EDGE_GAP: "SORT_EDGE_GAP" // NEW
   };
   const FilterType = {
     FILTER_GOBLINS: "FILTER_GOBLINS",
@@ -732,7 +763,7 @@ const CompetitionId = {
       };
     })(
       FilterType.FILTER_HIGH_ODDS_HIGH_TREND,
-      SortingType.SORT_ODDS
+      SortingType.SORT_EDGE_GAP // default to Edge Gap sort (highest positive first)
     )
   );
   
