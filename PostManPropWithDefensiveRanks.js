@@ -1,4 +1,4 @@
-// PostManPropWithDefensiveRanks (with Period, Approval tag, Edge note w/ implied prob gap, and SORT_EDGE_GAP)
+// PostManPropWithDefensiveRanks + Recommended Slips (cards with WHY + est. win prob)
 
 const CompetitionId = {
     GBR_EPL: "GBR_EPL",
@@ -14,40 +14,33 @@ const CompetitionId = {
   var template = `
     <style>
       .table-wrap {
-        max-height: 80vh;
+        max-height: 70vh;
         overflow: auto;
         position: relative;
-        padding-bottom: 72px;
+        padding-bottom: 56px;
       }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        table-layout: auto;
-      }
+      table { width: 100%; border-collapse: collapse; table-layout: auto; }
       th, td {
-        border: 1px solid #ddd;
-        padding: 8px;
-        text-align: left;
-        word-break: break-word;
-        background: #fff;
+        border: 1px solid #ddd; padding: 8px; text-align: left; word-break: break-word; background: #fff;
       }
-      thead th {
-        position: sticky;
-        top: 0;
-        z-index: 3;
-        background-color: #f4f4f4;
-      }
-      tbody::after {
-        content: "";
-        display: block;
-        height: 72px;
-      }
+      thead th { position: sticky; top: 0; z-index: 3; background-color: #f4f4f4; }
+      tbody::after { content: ""; display: block; height: 56px; }
+  
       .dark-green-text { color: green; font-weight: bold; }
       .green-text { color: green; }
       .dark-red-text { color: red; font-weight: bold; }
       .red-text { color: red; }
       .orange-text { color: orange; }
       .tag { font-weight: 600; white-space: nowrap; }
+  
+      /* Cards */
+      .cards { margin-top: 16px; display: grid; grid-template-columns: repeat(auto-fill,minmax(320px,1fr)); gap: 12px; }
+      .card { border: 1px solid #ddd; border-radius: 8px; padding: 12px; background: #fff; }
+      .card h3 { margin: 0 0 6px; font-size: 16px; }
+      .meta { font-size: 12px; color: #555; margin-bottom: 8px; }
+      .legs { margin: 0; padding-left: 18px; }
+      .legs li { margin: 4px 0; }
+      .pill { display:inline-block; font-size: 11px; padding: 2px 6px; border-radius: 999px; border:1px solid #ddd; margin-left:6px;}
     </style>
   
     <div class="table-wrap">
@@ -92,6 +85,31 @@ const CompetitionId = {
         </tbody>
       </table>
     </div>
+  
+    {{#if slips.length}}
+    <div class="cards">
+      {{#each slips}}
+      <div class="card">
+        <h3>{{title}}</h3>
+        <div class="meta">
+          Est. hit prob: <strong>{{pctWin}}%</strong>
+          <span class="pill">{{size}}-pick</span>
+          <span class="pill">{{bucket}}</span>
+          <span class="pill">Sort: {{sortBasis}}</span>
+        </div>
+        <ol class="legs">
+          {{#each legs}}
+            <li>
+              {{player}} — <em>{{type}}</em> {{periodLabel}}, line {{line}}
+              <div class="meta">{{approvalTag}} · {{edgeNote}}</div>
+            </li>
+          {{/each}}
+        </ol>
+        {{#if why}}<div class="meta"><strong>Why:</strong> {{why}}</div>{{/if}}
+      </div>
+      {{/each}}
+    </div>
+    {{/if}}
   `;
   
   let leagueType = pm.environment.get("leagueType") || "NBA";
@@ -111,14 +129,9 @@ const CompetitionId = {
   console.log(`showPrizePicksOnly: ${showPrizePicksOnly}`);
   console.log(`Loaded data for league: ${leagueType}`);
   
-  // ---------- Config ----------
-  
+  // ---------- Configs ----------
   const OFFENSE_PROPS_BASKETBALL = new Set([
-    "STEALS",
-    "STEALS_BLOCKS",
-    "BLOCKS",
-    "DEFENSIVE_REBOUNDS",
-    "TURNOVERS"
+    "STEALS", "STEALS_BLOCKS", "BLOCKS", "DEFENSIVE_REBOUNDS", "TURNOVERS"
   ]);
   
   const STAT_MAP_BASKETBALL = {
@@ -186,66 +199,21 @@ const CompetitionId = {
   };
   
   const LEAGUE_CONFIGS = {
-    NBA: {
-      type: "basketball",
-      seasonEnv: "nbaSeasonYear",
-      defaultYear: "2024",
-      statMap: STAT_MAP_BASKETBALL,
-      offenseProps: OFFENSE_PROPS_BASKETBALL,
-      teamCountFallback: 30,
-      thresholds: { heavy: 20, midHigh: 16, midLow: 10 }
-    },
-    WNBA: {
-      type: "basketball",
-      seasonEnv: "wnbaSeasonYear",
-      defaultYear: "2025",
-      statMap: STAT_MAP_BASKETBALL,
-      offenseProps: OFFENSE_PROPS_BASKETBALL,
-      teamCountFallback: 13,
-      thresholds: "dynamic_tertiles"
-    },
-    NFL: {
-      type: "nfl",
-      seasonEnv: "nflSeasonYear",
-      defaultYear: "2024",
-      statMap: STAT_MAP_NFL,
-      offenseProps: new Set(),
-      teamCountFallback: 32,
-      thresholds: { heavy: 24, midHigh: 20, midLow: 12 }
-    },
-    NHL: {
-      type: "hockey",
-      seasonEnv: "nhlSeasonYear",
-      defaultYear: "2024",
-      statMap: STAT_MAP_BASKETBALL, // replace if you have NHL keys
-      offenseProps: new Set(),
-      teamCountFallback: 32,
-      thresholds: { heavy: 22, midHigh: 17, midLow: 10 }
-    },
-    SOCCER: {
-      type: "soccer",
-      seasonEnv: "soccerSeasonYear",
-      defaultYear: "2024",
-      statMap: STAT_MAP_SOCCER,
-      offenseProps: new Set(),
-      teamCountFallback: 20,
-      thresholds: "dynamic_tertiles"
-    }
+    NBA:  { type:"basketball", seasonEnv:"nbaSeasonYear",  defaultYear:"2024", statMap:STAT_MAP_BASKETBALL, offenseProps:OFFENSE_PROPS_BASKETBALL, teamCountFallback:30, thresholds:{ heavy:20, midHigh:16, midLow:10 }},
+    WNBA: { type:"basketball", seasonEnv:"wnbaSeasonYear", defaultYear:"2025", statMap:STAT_MAP_BASKETBALL, offenseProps:OFFENSE_PROPS_BASKETBALL, teamCountFallback:13, thresholds:"dynamic_tertiles" },
+    NFL:  { type:"nfl",        seasonEnv:"nflSeasonYear",  defaultYear:"2024", statMap:STAT_MAP_NFL,        offenseProps:new Set(),           teamCountFallback:32, thresholds:{ heavy:24, midHigh:20, midLow:12 }},
+    NHL:  { type:"hockey",     seasonEnv:"nhlSeasonYear",  defaultYear:"2024", statMap:STAT_MAP_BASKETBALL, offenseProps:new Set(),           teamCountFallback:32, thresholds:{ heavy:22, midHigh:17, midLow:10 }},
+    SOCCER:{type:"soccer",     seasonEnv:"soccerSeasonYear",defaultYear:"2024",statMap:STAT_MAP_SOCCER,     offenseProps:new Set(),           teamCountFallback:20, thresholds:"dynamic_tertiles" }
   };
   
   // ---------- Helpers ----------
-  
   function findOpponentTeam(playerTeamId, eventId) {
     const game = schedule?.events?.find(g => g.eventId == eventId);
     if (!game) return null;
     if (game?.home?.teamId == null || game?.away?.teamId == null) return "N/A";
     return playerTeamId == game.home.teamId ? game.away.teamId : game.home.teamId;
   }
-  
-  function getLeagueConfig(leagueType) {
-    return LEAGUE_CONFIGS[leagueType] || LEAGUE_CONFIGS.NBA;
-  }
-  
+  function getLeagueConfig(leagueType) { return LEAGUE_CONFIGS[leagueType] || LEAGUE_CONFIGS.NBA; }
   function pickSeasonFromContent(leagueType, content, competitionId, preferredYear) {
     if (!content) return null;
     if (leagueType === "SOCCER" && competitionId) {
@@ -258,12 +226,8 @@ const CompetitionId = {
     if (!seasons.length) return null;
     return seasons.find(s => s.year == preferredYear) || latestSeason(seasons);
   }
-  function latestSeason(seasons) {
-    return seasons.reduce((a, b) => (+b.year > +a.year ? b : a));
-  }
-  function getTeamFromSeason(season, teamId) {
-    return season?.teams?.find(t => t.teamId == teamId) || null;
-  }
+  function latestSeason(seasons) { return seasons.reduce((a,b)=>(+b.year>+a.year?b:a)); }
+  function getTeamFromSeason(season, teamId) { return season?.teams?.find(t => t.teamId == teamId) || null; }
   function getStatArrayForLeague(team, league, propType) {
     const overall = team?.rankings?.statRankings?.overall;
     if (!overall) return [];
@@ -276,21 +240,19 @@ const CompetitionId = {
     if (!key) return "N/A";
     if (key.includes("|")) {
       const parts = key.split("|");
-      const vals = parts
-        .map(k => stats.find(s => s.stat === k)?.rank)
-        .filter(v => typeof v === "number");
+      const vals = parts.map(k => stats.find(s => s.stat === k)?.rank).filter(v => typeof v === "number");
       if (!vals.length) return "N/A";
-      return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+      return Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
     }
     const hit = stats.find(s => s.stat === key);
     return typeof hit?.rank === "number" ? hit.rank : "N/A";
   }
   function fantasyScoreRankBasketball(stats) {
     const pra = stats.find(s => s.stat === "points|rebounds|assists")?.rank;
-    const sb = stats.find(s => s.stat === "steals|blocks")?.rank;
-    if (typeof pra === "number" && typeof sb === "number") return Math.round((pra + sb) / 2);
-    if (typeof pra === "number") return pra;
-    if (typeof sb === "number") return sb;
+    const sb  = stats.find(s => s.stat === "steals|blocks")?.rank;
+    if (typeof pra==="number" && typeof sb==="number") return Math.round((pra+sb)/2);
+    if (typeof pra==="number") return pra;
+    if (typeof sb==="number") return sb;
     return "N/A";
   }
   
@@ -310,16 +272,9 @@ const CompetitionId = {
     if (!team) return "N/A";
   
     const stats = getStatArrayForLeague(team, league, propType);
+    if (league.type === "basketball" && propType === "FANTASY_SCORE_PP") return fantasyScoreRankBasketball(stats);
   
-    if (league.type === "basketball" && propType === "FANTASY_SCORE_PP") {
-      return fantasyScoreRankBasketball(stats);
-    }
-  
-    const statKey =
-      (league.statMap && league.statMap[propType]) ||
-      (STAT_MAP_BASKETBALL[propType]) ||
-      null;
-  
+    const statKey = (league.statMap && league.statMap[propType]) || (STAT_MAP_BASKETBALL[propType]) || null;
     return rankForStatKey(stats, statKey);
   }
   
@@ -344,18 +299,11 @@ const CompetitionId = {
       const teamCount =
         (defensiveStats?.content && currentSeasonTeamCount(defensiveStats.content, leagueType, competitionId)) ||
         league.teamCountFallback;
-      const greenMax = Math.ceil(teamCount / 3);
-      const orangeMax = Math.ceil((teamCount * 2) / 3);
+      const greenMax = Math.ceil(teamCount/3);
+      const orangeMax = Math.ceil((teamCount*2)/3);
   
-      if (isOver) {
-        if (r <= greenMax) return "red-text";
-        if (r <= orangeMax) return "orange-text";
-        return "green-text";
-      } else {
-        if (r <= greenMax) return "green-text";
-        if (r <= orangeMax) return "orange-text";
-        return "red-text";
-      }
+      if (isOver) { if (r<=greenMax) return "red-text"; if (r<=orangeMax) return "orange-text"; return "green-text"; }
+      else { if (r<=greenMax) return "green-text"; if (r<=orangeMax) return "orange-text"; return "red-text"; }
     }
   
     const { heavy, midHigh, midLow } = league.thresholds || LEAGUE_CONFIGS.NBA.thresholds;
@@ -366,48 +314,34 @@ const CompetitionId = {
   }
   
   // ---- Early-season blending (NBA) ----
-  const isEarlySeason =
-    (pm.environment.get("nbaEarlySeason") === "true") && (leagueType === "NBA");
+  const isEarlySeason = (pm.environment.get("nbaEarlySeason") === "true") && (leagueType === "NBA");
   const EARLY_GAMES_CUTOFF = Number(pm.environment.get("nbaEarlyGamesCutoff")) || 12;
   
   const clamp01 = (x) => Math.max(0, Math.min(1, x));
   const nz = (v, fb = 0) => (Number.isFinite(Number(v)) ? Number(v) : fb);
   
-  function weightFromGames(gamesPlayed, cutoff = EARLY_GAMES_CUTOFF) {
-    return clamp01((Number(gamesPlayed) || 0) / cutoff);
-  }
+  function weightFromGames(gamesPlayed, cutoff = EARLY_GAMES_CUTOFF) { return clamp01((Number(gamesPlayed)||0)/cutoff); }
   function estimateGamesPlayed(stats) {
-    const l10 = nz(stats?.l10, 0);
-    const l5  = nz(stats?.l5, 0);
-    return Math.round(Math.max(l10 * 10, l5 * 5));
+    const l10 = nz(stats?.l10, 0); const l5 = nz(stats?.l5, 0);
+    return Math.round(Math.max(l10*10, l5*5));
   }
   function blendMetric(current, prior, w) {
     const c = Number.isFinite(Number(current)) ? Number(current) : null;
-    const p = Number.isFinite(Number(prior))   ? Number(prior)   : null;
-    if (c == null && p == null) return 0;
-    if (c == null) return p;
-    if (p == null) return c;
-    return (w * c) + ((1 - w) * p);
+    const p = Number.isFinite(Number(prior)) ? Number(prior) : null;
+    if (c==null && p==null) return 0; if (c==null) return p; if (p==null) return c;
+    return (w*c) + ((1-w)*p);
   }
   function getBlendedStats(stats) {
-    if (!((pm.environment.get("nbaEarlySeason") === "true") && (leagueType === "NBA"))) {
-      return {
-        l20: nz(stats?.l20, 0),
-        l10: nz(stats?.l10, 0),
-        l5:  nz(stats?.l5, 0),
-        h2h: nz(stats?.h2h, 0),
-        curSeason: nz(stats?.curSeason, 0),
-        prevSeason: nz(stats?.prevSeason, 0),
-        weight: 1
-      };
+    if (!(isEarlySeason)) {
+      return { l20:nz(stats?.l20,0), l10:nz(stats?.l10,0), l5:nz(stats?.l5,0), h2h:nz(stats?.h2h,0),
+               curSeason:nz(stats?.curSeason,0), prevSeason:nz(stats?.prevSeason,0), weight:1 };
     }
-    const gp = estimateGamesPlayed(stats);
-    const w  = weightFromGames(gp);
+    const gp = estimateGamesPlayed(stats); const w = weightFromGames(gp);
     return {
-      l20: blendMetric(stats?.l20,        stats?.prevSeason, w),
-      l10: blendMetric(stats?.l10,        stats?.prevSeason, w),
-      l5:  blendMetric(stats?.l5,         stats?.prevSeason, w),
-      h2h: blendMetric(stats?.h2h,        stats?.prevSeason, Math.min(1, w + 0.2)),
+      l20: blendMetric(stats?.l20, stats?.prevSeason, w),
+      l10: blendMetric(stats?.l10, stats?.prevSeason, w),
+      l5:  blendMetric(stats?.l5,  stats?.prevSeason, w),
+      h2h: blendMetric(stats?.h2h, stats?.prevSeason, Math.min(1, w+0.2)),
       curSeason: blendMetric(stats?.curSeason, stats?.prevSeason, w),
       prevSeason: nz(stats?.prevSeason, 0),
       weight: w
@@ -423,10 +357,9 @@ const CompetitionId = {
     return "red-text";
   }
   
-  // ---------- Edge helpers (with implied vs estimated probability) ----------
+  // ---------- Edge helpers ----------
   function americanToProb(odds) {
-    const o = Number(odds);
-    if (!Number.isFinite(o)) return null;
+    const o = Number(odds); if (!Number.isFinite(o)) return null;
     return (o < 0) ? (-o / (-o + 100)) : (100 / (o + 100));
   }
   function pickWindowAndPEst(outcome, rawStats) {
@@ -450,121 +383,96 @@ const CompetitionId = {
   
     return { label: chosen[0], value: Number(chosen[1]), pEst };
   }
-  // Edge note WITHOUT "vs line ..." (line already shown in Player column)
   function edgeNoteFor(outcome, rawStats, avgOdds) {
     const pick = pickWindowAndPEst(outcome, rawStats);
     if (!pick) return "";
-  
     const pImp = americanToProb(avgOdds);
-    const base = `${pick.label} ${pick.value.toFixed(2)}`; // removed line text
-  
+    const base = `${pick.label} ${pick.value.toFixed(2)}`; // no "vs line" here
     if (pImp == null) return base;
-  
     const gap = (pick.pEst - pImp) * 100;
     return `${base} (p_est ${(pick.pEst*100).toFixed(0)}% vs p_imp ${(pImp*100).toFixed(0)}% ⇒ ${gap >= 0 ? "+" : ""}${gap.toFixed(0)}%)`;
   }
-  // Numeric Edge Gap in percentage points (p_est - p_imp), e.g., +16 or -3
   function edgeGapFor(outcome, rawStats, avgOdds) {
     const pick = pickWindowAndPEst(outcome, rawStats);
     if (!pick) return null;
     const pImp = americanToProb(avgOdds);
     if (pImp == null) return null;
-    return (pick.pEst - pImp) * 100;
+    return (pick.pEst - pImp) * 100; // percentage points
   }
   
   // ---------- Sorting ----------
   function sortProps(a, b, sortingType) {
-    const toNum  = (v, fb = 0) => { const n = Number(v); return Number.isFinite(n) ? n : fb; };
-    const cmpAsc = (x, y) => (x === y ? 0 : (x < y ? -1 : 1));
-    const cmpDesc= (x, y) => (x === y ? 0 : (x > y ? -1 : 1));
-    const chain  = (...ds) => { for (const d of ds) if (d !== 0) return d; return 0; };
+    const toNum=(v,fb=0)=>{const n=Number(v); return Number.isFinite(n)?n:fb;};
+    const cmpAsc=(x,y)=>(x===y?0:(x<y?-1:1));
+    const cmpDesc=(x,y)=>(x===y?0:(x>y? -1:1));
+    const chain=(...ds)=>{for(const d of ds) if(d!==0) return d; return 0;};
   
-    const A = getBlendedStats(a?.stats || {});
-    const B = getBlendedStats(b?.stats || {});
-  
-    const oddsA   = toNum(getAvgOdds(a), +Infinity);
-    const oddsB   = toNum(getAvgOdds(b), +Infinity);
-    const seasonA = A.curSeason, seasonB = B.curSeason;
-  
-    const trendA = isPlayoffs ? (A.h2h + A.l5) : (A.h2h + A.l5 + A.l10);
-    const trendB = isPlayoffs ? (B.h2h + B.l5) : (B.h2h + B.l5 + B.l10);
-  
-    const defA = toNum(getOpponentDefenseRanking(a?.outcome?.teamId, a?.outcome?.eventId, a?.outcome?.proposition), 999);
-    const defB = toNum(getOpponentDefenseRanking(b?.outcome?.teamId, b?.outcome?.eventId, b?.outcome?.proposition), 999);
-  
-    const orfA = toNum(a?.orfScore, -Infinity);
-    const orfB = toNum(b?.orfScore, -Infinity);
-  
-    const nameA = String(a?.outcome?.marketLabel || "");
-    const nameB = String(b?.outcome?.marketLabel || "");
+    const A=getBlendedStats(a?.stats||{}), B=getBlendedStats(b?.stats||{});
+    const oddsA=toNum(getAvgOdds(a), +Infinity), oddsB=toNum(getAvgOdds(b), +Infinity);
+    const seasonA=A.curSeason, seasonB=B.curSeason;
+    const trendA=isPlayoffs?(A.h2h+A.l5):(A.h2h+A.l5+A.l10);
+    const trendB=isPlayoffs?(B.h2h+B.l5):(B.h2h+B.l5+B.l10);
+    const defA=toNum(getOpponentDefenseRanking(a?.outcome?.teamId,a?.outcome?.eventId,a?.outcome?.proposition),999);
+    const defB=toNum(getOpponentDefenseRanking(b?.outcome?.teamId,b?.outcome?.eventId,b?.outcome?.proposition),999);
+    const orfA=toNum(a?.orfScore,-Infinity), orfB=toNum(b?.orfScore,-Infinity);
+    const nameA=String(a?.outcome?.marketLabel||""), nameB=String(b?.outcome?.marketLabel||"");
   
     switch (sortingType) {
       case SortingType.SORT_DEFENSE_RANK:
-        return chain(
-          cmpDesc(defA, defB),
-          cmpDesc(seasonA, seasonB),
-          cmpAsc(oddsA, oddsB),
-          nameA.localeCompare(nameB)
-        );
+        return chain(cmpDesc(defA,defB), cmpDesc(seasonA,seasonB), cmpAsc(oddsA,oddsB), nameA.localeCompare(nameB));
       case SortingType.SORT_SEASON:
-        return chain(
-          cmpDesc(seasonA, seasonB),
-          cmpAsc(oddsA, oddsB),
-          cmpDesc(trendA, trendB),
-          nameA.localeCompare(nameB)
-        );
+        return chain(cmpDesc(seasonA,seasonB), cmpAsc(oddsA,oddsB), cmpDesc(trendA,trendB), nameA.localeCompare(nameB));
       case SortingType.SORT_ODDS:
-        return chain(
-          cmpAsc(oddsA, oddsB),
-          cmpDesc(trendA, trendB),
-          cmpDesc(seasonA, seasonB),
-          nameA.localeCompare(nameB)
-        );
+        return chain(cmpAsc(oddsA,oddsB), cmpDesc(trendA,trendB), cmpDesc(seasonA,seasonB), nameA.localeCompare(nameB));
       case SortingType.SORT_TREND:
-        return chain(
-          cmpDesc(trendA, trendB),
-          cmpDesc(seasonA, seasonB),
-          cmpAsc(oddsA, oddsB),
-          nameA.localeCompare(nameB)
-        );
+        return chain(cmpDesc(trendA,trendB), cmpDesc(seasonA,seasonB), cmpAsc(oddsA,oddsB), nameA.localeCompare(nameB));
       case SortingType.SORT_FAVORABLE_TREND:
-        return chain(
-          cmpDesc(orfA, orfB),
-          cmpDesc(trendA, trendB),
-          cmpDesc(seasonA, seasonB),
-          cmpAsc(oddsA, oddsB),
-          nameA.localeCompare(nameB)
-        );
+        return chain(cmpDesc(orfA,orfB), cmpDesc(trendA,trendB), cmpDesc(seasonA,seasonB), cmpAsc(oddsA,oddsB), nameA.localeCompare(nameB));
       case SortingType.SORT_EDGE_GAP: {
-        // Highest positive Edge Gap first; negatives next; nulls at bottom
-        const gapA_raw = (typeof a?.edgeGapPct !== "undefined" && a?.edgeGapPct !== null)
-          ? Number(a.edgeGapPct)
-          : edgeGapFor(a?.outcome, a?.stats, getAvgOdds(a));
-        const gapB_raw = (typeof b?.edgeGapPct !== "undefined" && b?.edgeGapPct !== null)
-          ? Number(b.edgeGapPct)
-          : edgeGapFor(b?.outcome, b?.stats, getAvgOdds(b));
-  
-        const posA = Number.isFinite(gapA_raw) ? (gapA_raw >= 0 ? 2 : 1) : 0;
-        const posB = Number.isFinite(gapB_raw) ? (gapB_raw >= 0 ? 2 : 1) : 0;
-  
-        const gapA = Number.isFinite(gapA_raw) ? gapA_raw : -Infinity;
-        const gapB = Number.isFinite(gapB_raw) ? gapB_raw : -Infinity;
-  
+        const gapA_raw = (typeof a?.edgeGapPct!=="undefined"&&a?.edgeGapPct!==null)?Number(a.edgeGapPct):edgeGapFor(a?.outcome,a?.stats,getAvgOdds(a));
+        const gapB_raw = (typeof b?.edgeGapPct!=="undefined"&&b?.edgeGapPct!==null)?Number(b.edgeGapPct):edgeGapFor(b?.outcome,b?.stats,getAvgOdds(b));
+        const posA = Number.isFinite(gapA_raw)?(gapA_raw>=0?2:1):0;
+        const posB = Number.isFinite(gapB_raw)?(gapB_raw>=0?2:1):0;
+        const gapA = Number.isFinite(gapA_raw)?gapA_raw:-Infinity;
+        const gapB = Number.isFinite(gapB_raw)?gapB_raw:-Infinity;
         return chain(
-          cmpDesc(posA, posB),       // positives → negatives → nulls
-          cmpDesc(gapA, gapB),       // larger edge first
-          cmpDesc(trendA, trendB),   // then trend
-          cmpDesc(seasonA, seasonB), // then season quality
-          cmpAsc(oddsA, oddsB),      // then price (more negative first)
-          nameA.localeCompare(nameB) // final tie-break
+          cmpDesc(posA,posB),        // positives → negatives → nulls
+          cmpDesc(gapA,gapB),        // larger positive first
+          cmpDesc(trendA,trendB),
+          cmpDesc(seasonA,seasonB),
+          cmpAsc(oddsA,oddsB),
+          nameA.localeCompare(nameB)
         );
       }
-      default:
-        return 0;
+      default: return 0;
     }
   }
   
-  // ---------- Approval tag ----------
+  // ---------- Approval ----------
+  function isSafeRegular(stats) {
+    if (stats.curSeason < .54 || stats.h2h == null || stats.h2h < 0.66 || (stats.l5 < stats.l10 || stats.l10 < (stats.l20 * .9))) return 0;
+    let hits=0;
+    if (stats.l20 >= 0.5) hits++;
+    if (stats.l10 >= 0.6) hits++;
+    if (stats.l5 >= 0.6) hits++;
+    if (stats.h2h >= 0.80) hits++;
+    if (stats.curSeason >= 0.55) hits++;
+    if (stats.l5 >= stats.l10 && stats.l10 > stats.l20) hits++;
+    return hits >= 5;
+  }
+  function isSafeRegularPlayoffs(item) { let s=item.stats; return !(s.l5<.6 || s.h2h<=.6); }
+  function isSafeGoblin(stats, avgOdds) {
+    let hits=0;
+    if (stats.l20 >= 0.8) hits++;
+    if (stats.l10 >= 0.8) hits++;
+    if (stats.l5 >= 0.8) hits++;
+    if (stats.curSeason >= 0.75) hits++;
+    if (stats.h2h == null || stats.h2h >= 0.7) hits++; else hits--;
+    return hits >= 4 && avgOdds <= -300;
+  }
+  function isSafeGoblinPlayoffs(item) { let s=item.stats; return !(s.l5<.6 || s.h2h<.9); }
+  function isSafe2ndHalf(stats, periodLabel) { return (periodLabel=="2H"||periodLabel=="4Q"||periodLabel=="1Q"); }
+  
   function approvalTagFor(item) {
     const blended = getBlendedStats(item.stats || {});
     const avgOdds = getAvgOdds(item);
@@ -577,7 +485,7 @@ const CompetitionId = {
     return "⚠ Trend mismatch";
   }
   
-  // ---------- Map props (adds Period, Approval, Edge) ----------
+  // ---------- Map props ----------
   function mapProps(item, filterType) {
     const { outcome, stats: raw } = item;
     const stats = getBlendedStats(raw);
@@ -599,19 +507,16 @@ const CompetitionId = {
     const defenseClass = defenseClassForRank(opponentDefenseRank, isOver, leagueType);
     if (opponentDefenseRank == "N/A" && opponentTeamName === "Unknown Team") return null;
   
-    const l20Color        = trendClass(stats.l20);
-    const l10Color        = trendClass(stats.l10);
-    const l5Color         = trendClass(stats.l5);
-    const h2hColor        = trendClass(stats.h2h);
-    const curSeasonColor  = trendClass(stats.curSeason);
-    const prevSeasonColor = trendClass(raw?.prevSeason);
-    const favorableColor  = trendClass(item.orfScore);
+    const l20Color = trendClass(stats.l20), l10Color=trendClass(stats.l10), l5Color=trendClass(stats.l5),
+          h2hColor=trendClass(stats.h2h), curSeasonColor=trendClass(stats.curSeason), prevSeasonColor=trendClass(raw?.prevSeason),
+          favorableColor = trendClass(item.orfScore);
   
     const playerPrefix = isPrizePicks ? "PP: " : (isSleeper ? "SL: " : "");
     const periodLabel  = outcome.periodLabel || "Full";
-  
     const approvalTag  = approvalTagFor(item);
-    const edgeNote     = edgeNoteFor(outcome, raw || {}, getAvgOdds(item));
+    const avgOdds = getAvgOdds(item);
+    const edgeNote = edgeNoteFor(outcome, raw || {}, avgOdds);
+    const edgeGapPct = edgeGapFor(outcome, raw || {}, avgOdds); // numeric for sorting/slips
   
     return includeItem ? {
       player: `${playerPrefix}${outcome.marketLabel} vs ${opponentTeamName} (${item.orfScore})`,
@@ -619,22 +524,14 @@ const CompetitionId = {
       periodLabel,
       line: outcome.line,
   
-      // display raw values
       l20: raw?.l20, l10: raw?.l10, l5: raw?.l5, h2h: raw?.h2h,
       curSeason: raw?.curSeason, prevSeason: raw?.prevSeason,
   
-      // color classes (from blended)
       l20Color, l10Color, l5Color, h2hColor, curSeasonColor, prevSeasonColor,
+      defenseRank: opponentDefenseRank, defenseClass, favorableColor,
   
-      defenseRank: opponentDefenseRank,
-      defenseClass,
-      favorableColor,
+      approvalTag, edgeNote, edgeGapPct,
   
-      // new columns
-      approvalTag,
-      edgeNote,
-  
-      // odds
       CAESARS_odds: outcome.bookOdds.CAESARS?.odds,
       FANDUEL_odds: outcome.bookOdds.FANDUEL?.odds,
       DK_odds:      outcome.bookOdds.DRAFTKINGS?.odds,
@@ -643,7 +540,7 @@ const CompetitionId = {
       PP_odds:      outcome.bookOdds.PRIZEPICKS?.odds,
       UD_odds:      outcome.bookOdds.UNDERDOG?.odds,
       SleeperOdds:  outcome.bookOdds.SLEEPER?.odds,
-      AVG_ODDS:     getAvgOdds(item)
+      AVG_ODDS:     avgOdds
     } : null;
   }
   
@@ -662,44 +559,6 @@ const CompetitionId = {
     } else {
       return null;
     }
-  }
-  
-  // ---------- Safety checks ----------
-  function isSafeRegular(stats) {
-    if (stats.curSeason < .54 || stats.h2h == null || stats.h2h < 0.66 || (stats.l5 < stats.l10 || stats.l10 < (stats.l20 * .9))) return 0;
-    let hits = 0;
-    if (stats.l20 >= 0.5) hits++;
-    if (stats.l10 >= 0.6) hits++;
-    if (stats.l5 >= 0.6) hits++;
-    if (stats.h2h >= 0.80) hits++;
-    if (stats.curSeason >= 0.55) hits++;
-    if (stats.l5 >= stats.l10 && stats.l10 > stats.l20) hits++;
-    return hits >= 5;
-  }
-  function isSafeRegularPlayoffs(item) {
-    let stats = item.stats;
-    if (stats.l5 < .6 || stats.h2h <= .6) return false;
-    else return true;
-  }
-  function isSafeGoblin(stats, avgOdds) {
-    let hits = 0;
-    if (stats.l20 >= 0.8) hits++;
-    if (stats.l10 >= 0.8) hits++;
-    if (stats.l5 >= 0.8) hits++;
-    if (stats.curSeason >= 0.75) hits++;
-    if (stats.h2h == null || stats.h2h >= 0.7) hits++;
-    else hits--;
-    return hits >= 4 && avgOdds <= -300;
-  }
-  function isSafeGoblinPlayoffs(item) {
-    let stats = item.stats;
-    if (stats.l5 < .6 || stats.h2h < .9) return false;
-    else return true;
-  }
-  function isSafe2ndHalf(stats, periodLabel) {
-    if (periodLabel == "2H" || periodLabel == "4Q" || periodLabel == "1Q") {
-      return true;
-    } else { return false; }
   }
   
   // ---------- Filters ----------
@@ -731,6 +590,97 @@ const CompetitionId = {
     return (safeGoblin || safeRegular);
   }
   
+  // ---------- Slip builder ----------
+  function estPEstForRow(row) {
+    // re-derive p_est from the window we used for edgeNote
+    const dummyOutcome = {
+      outcomeLabel: row.type
+    };
+    const rawStats = {
+      l5: row.l5, l10: row.l10, h2h: row.h2h, curSeason: row.curSeason, prevSeason: row.prevSeason
+    };
+    const pick = pickWindowAndPEst(dummyOutcome, rawStats);
+    return pick ? pick.pEst : null;
+  }
+  function uniqueByPlayer(arr) {
+    const seen = new Set();
+    return arr.filter(r => {
+      const key = r.player.replace(/\s+\(.+?\)$/,''); // strip orfScore suffix
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+  function topByGap(list, n) {
+    return uniqueByPlayer(list
+      .filter(r => typeof r.edgeGapPct === "number")
+      .sort((a,b) => b.edgeGapPct - a.edgeGapPct)
+    ).slice(0, n);
+  }
+  function product(arr) { return arr.reduce((a,b)=>a*b,1); }
+  function pct(x) { return Math.round(x*100); }
+  
+  function buildRecommendedSlips(rows) {
+    const goblins = rows.filter(r => r.approvalTag === "✅ Goblin");
+    const regulars = rows.filter(r => r.approvalTag === "✅ Regular");
+  
+    const slips = [];
+  
+    // 1) Goblin Core (2-pick)
+    const core2 = topByGap(goblins, 2);
+    if (core2.length === 2) {
+      const pEsts = core2.map(estPEstForRow).filter(Number.isFinite);
+      const pWin = pEsts.length===2 ? product(pEsts) : null;
+      slips.push({
+        title: "Goblin Core (2-pick)",
+        size: 2,
+        bucket: "Goblin",
+        sortBasis: "Edge Gap",
+        pctWin: pWin ? pct(pWin) : "—",
+        legs: core2,
+        why: "Two strongest Goblins by positive Edge Gap; both pass strict hit-rate & price filters."
+      });
+    }
+  
+    // 2) Mixed Trio (3-pick: top 2 goblins + best regular)
+    const core2for3 = topByGap(goblins, 2);
+    const reg1 = topByGap(regulars, 1);
+    if (core2for3.length === 2 && reg1.length === 1) {
+      const trio = uniqueByPlayer([...core2for3, ...reg1]).slice(0,3);
+      if (trio.length === 3) {
+        const pEsts = trio.map(estPEstForRow).filter(Number.isFinite);
+        const pWin = pEsts.length===3 ? product(pEsts) : null;
+        slips.push({
+          title: "Mixed Trio (3-pick)",
+          size: 3,
+          bucket: "Mixed",
+          sortBasis: "Edge Gap",
+          pctWin: pWin ? pct(pWin) : "—",
+          legs: trio,
+          why: "Blend of two high-edge Goblins plus the top Regular to diversify risk across props."
+        });
+      }
+    }
+  
+    // 3) Regular Value (2-pick)
+    const reg2 = topByGap(regulars, 2);
+    if (reg2.length === 2) {
+      const pEsts = reg2.map(estPEstForRow).filter(Number.isFinite);
+      const pWin = pEsts.length===2 ? product(pEsts) : null;
+      slips.push({
+        title: "Regular Value (2-pick)",
+        size: 2,
+        bucket: "Regular",
+        sortBasis: "Edge Gap",
+        pctWin: pWin ? pct(pWin) : "—",
+        legs: reg2,
+        why: "Highest positive Edge Gap among Regular approvals; trend-up with reasonable books’ price."
+      });
+    }
+  
+    return slips;
+  }
+  
   // ---------- Constants ----------
   const SortingType = {
     SORT_SEASON: "CurSeasonFirst",
@@ -738,7 +688,7 @@ const CompetitionId = {
     SORT_DEFENSE_RANK: "SORT_DEFENSE_RANK",
     SORT_TREND: "SORT_TREND",
     SORT_FAVORABLE_TREND: "SORT_FAVORABLE_TREND",
-    SORT_EDGE_GAP: "SORT_EDGE_GAP" // NEW
+    SORT_EDGE_GAP: "SORT_EDGE_GAP"
   };
   const FilterType = {
     FILTER_GOBLINS: "FILTER_GOBLINS",
@@ -752,18 +702,19 @@ const CompetitionId = {
     template,
     (function constructVisualizerPayload(filterType, sortingType) {
       var responseData = pm.response.json();
-      var filteredData = responseData.props
+      var rows = responseData.props
         .filter(item => filterProps(item, filterType))
         .sort((a, b) => sortProps(a, b, sortingType))
         .map(item => mapProps(item, filterType))
         .filter(item => item !== null);
-      return {
-        filteredData: filteredData,
-        isPlayoffs: isPlayoffs
-      };
+  
+      // Build recommended slips from already-mapped rows (they contain approvalTag + edge fields)
+      const slips = buildRecommendedSlips(rows);
+  
+      return { filteredData: rows, isPlayoffs: isPlayoffs, slips };
     })(
       FilterType.FILTER_HIGH_ODDS_HIGH_TREND,
-      SortingType.SORT_EDGE_GAP // default to Edge Gap sort (highest positive first)
+      SortingType.SORT_EDGE_GAP // default: highest positive Edge Gap first
     )
   );
   
