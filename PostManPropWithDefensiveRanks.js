@@ -585,20 +585,22 @@ const CompetitionId = {
   
   // ---------- Odds average ----------
   function getAvgOdds(item) {
-    let sportsbookOdds = [
+    const sportbookOdds = [
       item.outcome.bookOdds?.CAESARS?.odds,
       item.outcome.bookOdds?.FANDUEL?.odds,
       item.outcome.bookOdds?.DRAFTKINGS?.odds,
       item.outcome.bookOdds?.BET365?.odds,
       item.outcome.bookOdds?.BETMGM?.odds
-    ].map(odds => parseFloat(odds)).filter(odds => !isNaN(odds));
-    if (sportsbookOdds.length > 0) {
-      let averageOdds = Math.round(sportsbookOdds.reduce((sum, odds) => sum + odds, 0) / sportsbookOdds.length);
-      return averageOdds;
-    } else {
-      return null;
-    }
+    ]
+      .map(o => Number(o))
+      .filter(n => Number.isFinite(n));
+  
+    if (!sportbookOdds.length) return null;
+  
+    const sum = sportbookOdds.reduce((a, b) => a + b, 0);
+    return Math.round(sum / sportbookOdds.length);
   }
+  
   
   // ---------- Filters ----------
   function filterProps(item, filterType) {
@@ -629,7 +631,7 @@ const CompetitionId = {
   
     if (showOnlyGoblins)      return safeGoblin;
     if (showOnly2ndHalf)      return (safeGoblin || safe2ndHalf);
-    if (isPlayoffs)           return (isSafeGoblinPlayoffs && isGoblin) || safeRegularPlayoffs;
+    if (isPlayoffs)           return (isGoblin && isSafeGoblinPlayoffs(item)) || safeRegularPlayoffs;
     return (safeGoblin || safeRegular);
   }
   
@@ -713,7 +715,7 @@ const CompetitionId = {
   // All Goblin pairs (2-pick) with positive edge gaps
   function buildAllGoblinPairs(rows) {
     const goblinsPos = rows
-      .filter(r => r.approvalTag === "✅ Goblin" && typeof r.edgeGapPct === "number" && r.edgeGapPct > 0);
+      .filter(r => r.approvalTag === "✅ Goblin" && typeof r.edgeGapPct === "number" && r.edgeGapPct >= 0);
   
     const uniq = uniqueByPlayer(goblinsPos);
     const pairs = combinations2(uniq)
@@ -740,20 +742,13 @@ const CompetitionId = {
   
   // Mega slip (Regulars only) — no duplicate player names or playerKeys
   function buildMegaSlip(rows) {
-    // Helper: get a canonical player name from the display string
     const canonicalPlayerName = (r) => {
-      // Prefer a structured name if you have it
       if (r.playerName) return String(r.playerName).trim();
-  
-      // Fallback: parse from "PP: Stephen Curry - Rebounds vs ..." etc.
       const label = String(r.player || r.outcome?.marketLabel || "");
-      // strip PP:/SL: prefixes
       const noPrefix = label.replace(/^(PP:|SL:)\s*/i, "");
-      // take text before " - "
       return noPrefix.split(" - ")[0].trim();
     };
   
-    // Keep only Regular approvals with positive edge gaps
     const regularPositives = uniqueByPlayer(
       rows
         .filter(r =>
@@ -770,26 +765,21 @@ const CompetitionId = {
     const usedPlayerNames = new Set();
     let legs = [];
   
-    // First pass: pick diverse, high-gap Regulars
     for (const r of regularPositives) {
       const name = canonicalPlayerName(r);
       if (usedPlayerKeys.has(r.playerKey) || usedPlayerNames.has(name)) continue;
-  
-      // light diversity rule: avoid stacking exact same team/period/side early
       const sameBucket = legs.filter(x =>
         x._teamId === r._teamId &&
         x.periodLabel === r.periodLabel &&
         x._isOver === r._isOver
       );
       if (sameBucket.length > 0 && legs.length >= 3) continue;
-  
       legs.push(r);
       usedPlayerKeys.add(r.playerKey);
       usedPlayerNames.add(name);
-      if (legs.length >= 6) break; // target up to 6 for mega
+      if (legs.length >= 6) break;
     }
   
-    // Second pass: fill remaining slots (still no duplicate names/keys)
     for (const r of regularPositives) {
       if (legs.length >= 6) break;
       const name = canonicalPlayerName(r);
@@ -799,14 +789,11 @@ const CompetitionId = {
       usedPlayerNames.add(name);
     }
   
-    // Choose largest possible size: 6 → 5 → 4 → 3
     const targetSizes = [6, 5, 4, 3];
     const chosenSize = targetSizes.find(sz => legs.length >= sz);
     if (!chosenSize) return null;
-  
     legs = legs.slice(0, chosenSize);
   
-    // Estimated slip hit probability from per-leg p_est (if available)
     const pEsts = legs.map(estPEstForRow).filter(Number.isFinite);
     const pWin = (pEsts.length === legs.length)
       ? pEsts.reduce((a, b) => a * b, 1)
@@ -825,8 +812,6 @@ const CompetitionId = {
   
   function buildRecommendedSlips(rows) {
     const slips = [];
-  
-    // Goblin Core (2-pick) from top two goblins
     const goblins = rows.filter(r => r.approvalTag === "✅ Goblin");
     const core2 = topByGap(goblins, 2);
     if (core2.length === 2) {
@@ -842,12 +827,9 @@ const CompetitionId = {
         why: "Two strongest Goblins by positive Edge Gap; both pass strict hit-rate & price filters."
       });
     }
-  
-    // All Goblin pairs
     const goblinPairs = buildAllGoblinPairs(rows);
     slips.push(...goblinPairs);
   
-    // Mixed Trio (3-pick): top 2 goblins + best regular
     const reg1 = topByGap(rows.filter(r => r.approvalTag==="✅ Regular"), 1);
     if (core2.length === 2 && reg1.length === 1) {
       const trio = uniqueByPlayer([...core2, ...reg1]).slice(0,3);
@@ -865,74 +847,44 @@ const CompetitionId = {
         });
       }
     }
-  
-    // ALL Regular Value (2-pick)
     const allRegPairs = buildAllRegularPairs(rows);
     slips.push(...allRegPairs);
-  
-    // Mega Slip (6→5→4→3)
     const mega = buildMegaSlip(rows);
     if (mega) slips.push(mega);
-  
     return slips;
   }
   
   // Partition slips into unique distribution and duplicates (across slips)
   // + filter rule: in DUPES, DO NOT include 2-pick slips with two Goblins
-  // + NEW: cap each player's appearances in the DUPES list to maxDupesPerPlayer (default 2)
+  // + NEW: cap the number of DUPES slips any single player can appear in
   function partitionSlipsUnique(slips) {
     const used = new Set();
     const unique = [];
     let dupes = [];
-
+  
     const slipHasDup = (legs) => legs.some(l => used.has(l.playerKey));
     const addLegs = (legs) => legs.forEach(l => used.add(l.playerKey));
-
-    // First pass: split into unique vs dupes buckets
+  
     for (const s of slips) {
-      if (slipHasDup(s.legs)) {
-        dupes.push(s);
-      } else {
-        unique.push(s);
-        addLegs(s.legs);
-      }
+      if (slipHasDup(s.legs)) dupes.push(s);
+      else { unique.push(s); addLegs(s.legs); }
     }
-
-    // Filter: no 2-man with 2 Goblins in DUPES
-    dupes = dupes.filter(s => {
-      if (s.size !== 2) return true;
-      const allGoblins = s.legs.every(l => l.approvalTag === "✅ Goblin");
-      return !allGoblins; // keep only if NOT both goblins
-    });
-
-    // NEW — cap the number of DUPES slips any single player can appear in
+  
+    dupes = dupes.filter(s => !(s.size===2 && s.legs.every(l => l.approvalTag === "✅ Goblin")));
+  
     const perPlayerCap = Number(pm.environment.get("maxDupesPerPlayer")) || 2;
     const appearances = Object.create(null);
     const cappedDupes = [];
-
     for (const slip of dupes) {
-      // Would adding this slip exceed the cap for any leg?
-      const wouldExceed = slip.legs.some(leg => {
-        const k = leg.playerKey;
-        const current = appearances[k] || 0;
-        return current >= perPlayerCap;
-      });
-
+      const wouldExceed = slip.legs.some(leg => (appearances[leg.playerKey]||0) >= perPlayerCap);
       if (wouldExceed) continue;
-
-      // Accept slip and update counts
       cappedDupes.push(slip);
-      for (const leg of slip.legs) {
-        const k = leg.playerKey;
-        appearances[k] = (appearances[k] || 0) + 1;
-      }
+      for (const leg of slip.legs) appearances[leg.playerKey] = (appearances[leg.playerKey]||0)+1;
     }
-
-    // Respect overall max duplicate slips
+  
     const MAX_DUPLICATE_SLIPS = Number(pm.environment.get("maxDuplicateSlips")) || 10;
     return { unique, dupes: cappedDupes.slice(0, MAX_DUPLICATE_SLIPS) };
-}
-
+  }
   
   // ---------- Constants ----------
   const SortingType = {
@@ -972,7 +924,7 @@ const CompetitionId = {
       };
     })(
       FilterType.FILTER_HIGH_ODDS_HIGH_TREND,
-      SortingType.SORT_EDGE_GAP // default = highest positive Edge Gap first
+      SortingType.SORT_EDGE_GAP
     )
   );
   
