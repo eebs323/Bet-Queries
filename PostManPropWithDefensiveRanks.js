@@ -31,11 +31,13 @@ const CompetitionId = {
       /* Cards */
       .cards { margin-top: 16px; display: grid; grid-template-columns: repeat(auto-fill,minmax(320px,1fr)); gap: 12px; }
       .card { border: 1px solid #ddd; border-radius: 8px; padding: 12px; background: #fff; }
-      .card h3 { margin: 0 0 6px; font-size: 16px; }
+      .card h3 { margin: 0 0 12px; font-size: 16px; display: flex; justify-content: space-between; align-items: center; }
+      .card h3 .prob { font-size: 14px; color: #555; }
       .meta { font-size: 12px; color: #555; margin-bottom: 8px; }
       .legs { margin: 0; padding-left: 18px; }
       .legs li { margin: 4px 0; }
-      .pill { display:inline-block; font-size: 11px; padding: 2px 6px; border-radius: 999px; border:1px solid #ddd; margin-left:6px;}
+      .legs li .gap { color: #555; font-size: 12px; }
+      .legs li .detail { display: block; font-size: 12px; color: #666; margin-top: 2px; }
     </style>
   
     <div class="table-wrap">
@@ -85,22 +87,18 @@ const CompetitionId = {
     <div class="cards">
       {{#each slips}}
       <div class="card">
-        <h3>{{title}}</h3>
-        <div class="meta">
-          Est. hit prob: <strong>{{pctWin}}%</strong>
-          <span class="pill">{{size}}-pick</span>
-          <span class="pill">{{bucket}}</span>
-          <span class="pill">Sort: {{sortBasis}}</span>
-        </div>
+        <h3>
+          {{title}}
+          <span class="prob">{{pctWin}}%</span>
+        </h3>
         <ol class="legs">
           {{#each legs}}
             <li>
-              {{player}} — <em>{{type}}</em> {{periodLabel}}, line {{line}}
-              <div class="meta">{{approvalTag}} · {{edgeNote}}</div>
+              {{player}} <span class="gap">({{edgeNote}})</span>
+              <span class="detail">{{type}} {{line}} · H2H: {{h2h}}</span>
             </li>
           {{/each}}
         </ol>
-        {{#if why}}<div class="meta"><strong>Why:</strong> {{why}}</div>{{/if}}
       </div>
       {{/each}}
     </div>
@@ -385,10 +383,9 @@ const CompetitionId = {
     const pick = pickWindowAndPEst(outcome, rawStats);
     if (!pick) return "";
     const pImp = americanToProb(avgOdds);
-    const base = `${pick.label} ${pick.value.toFixed(2)}`; // no "vs line" (already in Player)
-    if (pImp == null) return base;
+    if (pImp == null) return "";
     const gap = (pick.pEst - pImp) * 100;
-    return `${base} (p_est ${(pick.pEst*100).toFixed(0)}% vs p_imp ${(pImp*100).toFixed(0)}% ⇒ ${gap >= 0 ? "+" : ""}${gap.toFixed(0)}%)`;
+    return `p_est ${(pick.pEst*100).toFixed(0)}% vs p_imp ${(pImp*100).toFixed(0)}% ⇒ ${gap >= 0 ? "+" : ""}${Math.round(gap)}%`;
   }
   function edgeGapFor(outcome, rawStats, avgOdds) {
     const pick = pickWindowAndPEst(outcome, rawStats);
@@ -507,7 +504,7 @@ const CompetitionId = {
           h2hColor=trendClass(stats.h2h), curSeasonColor=trendClass(stats.curSeason), prevSeasonColor=trendClass(raw?.prevSeason),
           favorableColor = trendClass(item.orfScore);
   
-    const playerPrefix = isPrizePicks ? "PP: " : (isSleeper ? "SL: " : "");
+    const playerPrefix = isPrizePicks ? "" : (isSleeper ? "SL: " : "O:");
     const periodLabel  = outcome.periodLabel || "Full";
     const approvalTag  = approvalTagFor(item);
     const avgOdds = getAvgOdds(item);
@@ -516,7 +513,7 @@ const CompetitionId = {
   
     return includeItem ? {
       // display
-      player: `${playerPrefix}${outcome.marketLabel} vs ${opponentTeamName} (${item.orfScore})`,
+      player: `${playerPrefix}${outcome.marketLabel} vs ${opponentTeamName}`,
       type: outcome.outcomeLabel,
       periodLabel,
       line: outcome.line,
