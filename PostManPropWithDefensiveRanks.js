@@ -37,7 +37,11 @@ const CompetitionId = {
       .legs { margin: 0; padding-left: 18px; }
       .legs li { margin: 4px 0; }
       .legs li .gap { color: #555; font-size: 12px; }
-      .legs li .detail { display: block; font-size: 12px; color: #666; margin-top: 2px; }
+      .legs li .detail { display: block; font-size: 12px; color: #666; margin-top: 2px; line-height: 1.4; }
+      .legs li .defense { font-weight: bold; }
+      .legs li .defense.green-text { color: #008000; }
+      .legs li .defense.orange-text { color: #ff8c00; }
+      .legs li .defense.red-text { color: #ff0000; }
     </style>
   
     <div class="table-wrap">
@@ -95,7 +99,7 @@ const CompetitionId = {
           {{#each legs}}
             <li>
               {{player}} <span class="gap">({{edgeNote}})</span>
-              <span class="detail">{{type}} {{line}} · H2H: {{h2h}}</span>
+              <span class="detail">{{type}} {{line}} · L20: <span class="{{l20Color}}">{{l20}}</span> · L10: <span class="{{l10Color}}">{{l10}}</span> · L5: <span class="{{l5Color}}">{{l5}}</span> · H2H: <span class="{{h2hColor}}">{{h2h}}</span> · Szn25: <span class="{{curSeasonColor}}">{{curSeason}}</span> · Szn24: <span class="{{prevSeasonColor}}">{{prevSeason}}</span>{{#if defenseRank}} · VS: <span class="defense {{defenseClass}}">{{defenseRank}}</span>{{/if}}</span>
             </li>
           {{/each}}
         </ol>
