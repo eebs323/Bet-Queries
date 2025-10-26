@@ -748,10 +748,21 @@ const CompetitionId = {
   // Build one mega slip (prefer 6; fallback to 5→4→3) using strongest positive gaps,
   // mixing Goblins and Regulars and enforcing unique players.
   function buildMegaSlip(rows) {
-    // Only get regular props with positive edge gaps
+    // Calculate a score for each regular prop that factors in both H2H and edge gap
+    const scoreProp = (prop) => {
+      const h2hValue = Number(prop.h2h) || 0;
+      const edgeGap = Number(prop.edgeGapPct) || 0;
+      // Weight H2H more heavily in the scoring
+      return (h2hValue * 2) + edgeGap;
+    };
+
+    // Only get regular props with positive edge gaps, sorted by combined score
     const regulars = uniqueByPlayer(
-      rows.filter(r => r.approvalTag === "✅ Regular" && typeof r.edgeGapPct === "number" && r.edgeGapPct > 0)
-          .sort((a,b)=> b.edgeGapPct - a.edgeGapPct)
+      rows.filter(r => r.approvalTag === "✅ Regular" && 
+                      typeof r.edgeGapPct === "number" && 
+                      r.edgeGapPct > 0 &&
+                      r.h2h !== null)  // Ensure H2H data exists
+          .sort((a,b) => scoreProp(b) - scoreProp(a))
     );
   
     if (regulars.length === 0) return null;
@@ -765,7 +776,7 @@ const CompetitionId = {
         legs.push(r);
       }
     }
-    // Add any remaining high-gap regulars if needed
+    // Add any remaining high-scoring regulars if needed
     for (const r of regulars) {
       if (legs.length >= 6) break;
       if (!legs.find(x => x.player.replace(/\s+\(.+?\)$/,'') === r.player.replace(/\s+\(.+?\)$/,''))) {
@@ -778,21 +789,26 @@ const CompetitionId = {
     let chosenSize = targetSizes.find(sz => legs.length >= sz);
     legs = legs.slice(0, chosenSize);
     
-    // Sort final legs by gap value
-    legs.sort((a,b) => b.edgeGapPct - a.edgeGapPct);
+    // Sort final legs by combined score (H2H weighted more heavily)
+    legs.sort((a,b) => {
+      const scoreA = (Number(a.h2h) || 0) * 2 + (Number(a.edgeGapPct) || 0);
+      const scoreB = (Number(b.h2h) || 0) * 2 + (Number(b.edgeGapPct) || 0);
+      return scoreB - scoreA;
+    });
     
     const pEsts = legs.map(estPEstForRow).filter(Number.isFinite);
     const pWin = pEsts.length===legs.length ? product(pEsts) : null;
     const totalGap = legs.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
+    const avgH2H = legs.reduce((sum, prop) => sum + (Number(prop.h2h) || 0), 0) / legs.length;
   
     return {
-      title: `Mega Regular Slip (${legs.length}-pick) - Total Gap: ${totalGap}`,
+      title: `Mega Regular Slip (${legs.length}-pick) - Total Gap: ${totalGap}, Avg H2H: ${avgH2H.toFixed(2)}`,
       size: chosenSize,
       bucket: "Regular",
-      sortBasis: "Largest positive Edge Gaps",
+      sortBasis: "H2H + Edge Gaps",
       pctWin: pWin ? pct(pWin) : "—",
       legs,
-      why: "Top regular props with positive Edge Gaps, prioritizing diversity across sides/teams/periods. Props sorted by gap value."
+      why: "Top regular props prioritizing high H2H values and positive Edge Gaps, with diversity across sides/teams/periods. Props sorted by combined H2H and gap score."
     };
   }
   
