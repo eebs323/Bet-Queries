@@ -121,7 +121,7 @@ const CompetitionId = {
   let showOnly2ndHalf = pm.environment.get("showOnly2ndHalf") === "true";
   let showPrizePicksOnly = pm.environment.get("showPrizePicksOnly") === "true";
   
-  const MAX_REGULAR_PAIRS = Number(pm.environment.get("maxRegularPairs")) || 25;
+  const MAX_REGULAR_PAIRS = Number(pm.environment.get("maxRegularPairs")) || 100;
   
   console.log(`showOnlyGoblins: ${showOnlyGoblins}`);
   console.log(`showPrizePicksOnly: ${showPrizePicksOnly}`);
@@ -459,27 +459,25 @@ const CompetitionId = {
     return hits >= 5;
   }
   function isSafeRegularPlayoffs(item) { let s=item.stats; return !(s.l5<.6 || s.h2h<=.6); }
-  function isSafeGoblin(stats, avgOdds) {
+  function isSafeGoblin(stats) {
     let hits=0;
-    if (stats.l20 >= 0.8) hits++;
-    if (stats.l10 >= 0.8) hits++;
-    if (stats.l5 >= 0.8) hits++;
-    if (stats.curSeason >= 0.75) hits++;
+    if (stats.l20 >= 0.7) hits++;
+    if (stats.l10 >= 0.7) hits++;
+    if (stats.l5 >= 0.7) hits++;
+    if (stats.curSeason >= 0.7) hits++;
     if (stats.h2h == null || stats.h2h >= 0.7) hits++; else hits--;
-    return hits >= 4 && avgOdds <= -300;
+    return hits >= 4;
   }
   function isSafeGoblinPlayoffs(item) { let s=item.stats; return !(s.l5<.6 || s.h2h<.9); }
   function isSafe2ndHalf(stats, periodLabel) { return (periodLabel=="2H"||periodLabel=="4Q"||periodLabel=="1Q"); }
   
   function approvalTagFor(item) {
     const blended = getBlendedStats(item.stats || {});
-    const avgOdds = getAvgOdds(item);
-    const ppOdds  = parseFloat(item.outcome.bookOdds.PRIZEPICKS?.odds);
-    const noGoblin = ppOdds !== -137;
-    const isGoblin = Number.isFinite(avgOdds) && avgOdds <= -300;
-  
-    if (isGoblin && isSafeGoblin(blended, avgOdds)) return "✅ Goblin";
-    if (noGoblin && (isPlayoffs ? isSafeRegularPlayoffs(item) : isSafeRegular(blended))) return "✅ Regular";
+    const isGoblin = item.outcome.bookOdds.PRIZEPICKS?.identifier?.bookProps?.odds_type === "goblin" || 
+                     item.outcome.bookOdds.PRIZEPICKS?.identifier?.bookProps?.odds_label === "👿";
+
+    if (isGoblin && isSafeGoblin(blended)) return "✅ Goblin";
+    if (!isGoblin && (isPlayoffs ? isSafeRegularPlayoffs(item) : isSafeRegular(blended))) return "✅ Regular";
     return "⚠ Trend mismatch";
   }
   
@@ -564,7 +562,7 @@ const CompetitionId = {
       let averageOdds = Math.round(sportsbookOdds.reduce((sum, odds) => sum + odds, 0) / sportsbookOdds.length);
       return averageOdds;
     } else {
-      return null;
+      return -120; // Default to -120 odds when no valid odds are available
     }
   }
   
@@ -657,28 +655,92 @@ const CompetitionId = {
     const regularsPos = rows
       .filter(r => r.approvalTag === "✅ Regular" && typeof r.edgeGapPct === "number" && r.edgeGapPct > 0);
   
-    // Unique by player, then generate pairs and score for mix
+    // Unique by player first
     const uniq = uniqueByPlayer(regularsPos);
-    const pairs = combinations2(uniq)
-      .map(([a,b]) => ({ legs:[a,b], score: pairScore(a,b) }))
-      .sort((x,y) => y.score - x.score);
-  
-    // Convert to slip cards; optionally cap to keep UI sane
+    const playerAppearances = new Map(); // Track how many times each player appears
+    const usedPairs = new Set(); // Track unique pairs of players
     const maxPairs = MAX_REGULAR_PAIRS;
     const out = [];
-    for (let i=0; i<pairs.length && i<maxPairs; i++) {
-      const [a,b] = pairs[i].legs;
-      const pEsts = [a,b].map(estPEstForRow).filter(Number.isFinite);
-      const pWin = pEsts.length===2 ? product(pEsts) : null;
-      out.push({
-        title: `Regular Value (2-pick) #${i+1}`,
-        size: 2,
-        bucket: "Regular",
-        sortBasis: "Mix + Edge Gap",
-        pctWin: pWin ? pct(pWin) : "—",
-        legs: [a,b],
-        why: "Both legs show positive Edge Gap; pairing mixes risk profile (sides/teams/periods) when available."
-      });
+
+    // Helper to get clean player name without suffix
+    const getCleanPlayerName = (player) => player.replace(/\s+\(.+?\)$/,'');
+    
+    // Helper to create a unique key for a pair of players (order-independent)
+    const getPairKey = (player1, player2) => {
+      const name1 = getCleanPlayerName(player1.player);
+      const name2 = getCleanPlayerName(player2.player);
+      return [name1, name2].sort().join('|');
+    };
+    
+    // Helper to check if player is under appearance limit
+    const canUsePlayer = (player) => {
+      const name = getCleanPlayerName(player.player);
+      const count = playerAppearances.get(name) || 0;
+      return count < 2;
+    };
+
+    // Helper to check if this pair has been used before
+    const canUsePair = (player1, player2) => {
+      const pairKey = getPairKey(player1, player2);
+      return !usedPairs.has(pairKey);
+    };
+
+    // Helper to update appearance count for a player
+    const incrementPlayerCount = (player) => {
+      const name = getCleanPlayerName(player.player);
+      playerAppearances.set(name, (playerAppearances.get(name) || 0) + 1);
+    };
+
+    // Helper to mark a pair as used
+    const markPairAsUsed = (player1, player2) => {
+      const pairKey = getPairKey(player1, player2);
+      usedPairs.add(pairKey);
+    };
+
+    // For each player that still has room for more appearances
+    for (let i = 0; i < uniq.length && out.length < maxPairs; i++) {
+      const firstPlayer = uniq[i];
+      if (!canUsePlayer(firstPlayer)) continue;
+
+      // Find the best available partner for this player
+      let bestPartner = null;
+      let bestScore = -Infinity;
+
+      // Look through all other players for the best available partner
+      for (let j = 0; j < uniq.length; j++) {
+        if (i === j) continue; // Skip same player
+        const potentialPartner = uniq[j];
+        
+        // Skip if this partner is at their limit or we've used this pair before
+        if (!canUsePlayer(potentialPartner) || !canUsePair(firstPlayer, potentialPartner)) continue;
+
+        const score = pairScore(firstPlayer, potentialPartner);
+        if (score > bestScore) {
+          bestScore = score;
+          bestPartner = potentialPartner;
+        }
+      }
+
+      // If we found a valid partner, create the slip
+      if (bestPartner) {
+        const pEsts = [firstPlayer, bestPartner].map(estPEstForRow).filter(Number.isFinite);
+        const pWin = pEsts.length === 2 ? product(pEsts) : null;
+
+        // Update tracking
+        incrementPlayerCount(firstPlayer);
+        incrementPlayerCount(bestPartner);
+        markPairAsUsed(firstPlayer, bestPartner);
+
+        out.push({
+          title: `Regular Value (2-pick) #${out.length + 1}`,
+          size: 2,
+          bucket: "Regular",
+          sortBasis: "Mix + Edge Gap",
+          pctWin: pWin ? pct(pWin) : "—",
+          legs: [firstPlayer, bestPartner],
+          why: "Both legs show positive Edge Gap; pairing mixes risk profile (sides/teams/periods) when available."
+        });
+      }
     }
     return out;
   }
@@ -686,20 +748,16 @@ const CompetitionId = {
   // Build one mega slip (prefer 6; fallback to 5→4→3) using strongest positive gaps,
   // mixing Goblins and Regulars and enforcing unique players.
   function buildMegaSlip(rows) {
-    const positives = uniqueByPlayer(
-      rows.filter(r => typeof r.edgeGapPct==="number" && r.edgeGapPct>0)
+    // Only get regular props with positive edge gaps
+    const regulars = uniqueByPlayer(
+      rows.filter(r => r.approvalTag === "✅ Regular" && typeof r.edgeGapPct === "number" && r.edgeGapPct > 0)
           .sort((a,b)=> b.edgeGapPct - a.edgeGapPct)
     );
   
-    if (positives.length === 0) return null;
-  
-    // Try to assemble with diversity: aim for 6 with at least 2 Goblins + 2 Regulars if possible
-    const goblins  = positives.filter(r => r.approvalTag === "✅ Goblin");
-    const regulars = positives.filter(r => r.approvalTag === "✅ Regular");
+    if (regulars.length === 0) return null;
   
     let legs = [];
-    // Seed with up to 3 goblins and up to 3 regulars first
-    legs.push(...goblins.slice(0,3));
+    // Try to build diverse set of regular props
     for (const r of regulars) {
       if (legs.length >= 6) break;
       // avoid duplicate team + period + side if possible
@@ -707,11 +765,11 @@ const CompetitionId = {
         legs.push(r);
       }
     }
-    // Top off with remaining positives if needed
-    for (const x of positives) {
+    // Add any remaining high-gap regulars if needed
+    for (const r of regulars) {
       if (legs.length >= 6) break;
-      if (!legs.find(y => y.player.replace(/\s+\(.+?\)$/,'') === x.player.replace(/\s+\(.+?\)$/,''))) {
-        legs.push(x);
+      if (!legs.find(x => x.player.replace(/\s+\(.+?\)$/,'') === r.player.replace(/\s+\(.+?\)$/,''))) {
+        legs.push(r);
       }
     }
   
@@ -719,45 +777,54 @@ const CompetitionId = {
     const targetSizes = [6,5,4,3];
     let chosenSize = targetSizes.find(sz => legs.length >= sz);
     legs = legs.slice(0, chosenSize);
-  
+    
+    // Sort final legs by gap value
+    legs.sort((a,b) => b.edgeGapPct - a.edgeGapPct);
+    
     const pEsts = legs.map(estPEstForRow).filter(Number.isFinite);
     const pWin = pEsts.length===legs.length ? product(pEsts) : null;
+    const totalGap = legs.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
   
     return {
-      title: "Mega Slip (auto) ",
+      title: `Mega Regular Slip (${legs.length}-pick) - Total Gap: ${totalGap}`,
       size: chosenSize,
-      bucket: "Mixed",
+      bucket: "Regular",
       sortBasis: "Largest positive Edge Gaps",
       pctWin: pWin ? pct(pWin) : "—",
       legs,
-      why: "Top positive Edge Gap legs with diversity across sides/teams/periods when possible."
+      why: "Top regular props with positive Edge Gaps, prioritizing diversity across sides/teams/periods. Props sorted by gap value."
     };
   }
   
   function buildRecommendedSlips(rows) {
     const slips = [];
   
-    // Goblin Core (2-pick)
-    const goblins = rows.filter(r => r.approvalTag === "✅ Goblin");
-    const core2 = topByGap(goblins, 2);
-    if (core2.length === 2) {
-      const pEsts = core2.map(estPEstForRow).filter(Number.isFinite);
-      const pWin = pEsts.length===2 ? product(pEsts) : null;
+    // Get all safe goblins with positive edge gaps, sorted by gap value
+    const goblins = rows.filter(r => r.approvalTag === "✅ Goblin" && typeof r.edgeGapPct === "number" && r.edgeGapPct > 0)
+      .sort((a, b) => b.edgeGapPct - a.edgeGapPct);
+
+    // If we have any goblins, create a single slip with all of them
+    if (goblins.length > 0) {
+      const pEsts = goblins.map(estPEstForRow).filter(Number.isFinite);
+      const pWin = pEsts.length === goblins.length ? product(pEsts) : null;
+      const totalGap = goblins.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
+      
       slips.push({
-        title: "Goblin Core (2-pick)",
-        size: 2,
+        title: `Goblin Core (${goblins.length}-pick) - Total Gap: ${totalGap}`,
+        size: goblins.length,
         bucket: "Goblin",
         sortBasis: "Edge Gap",
         pctWin: pWin ? pct(pWin) : "—",
-        legs: core2,
-        why: "Two strongest Goblins by positive Edge Gap; both pass strict hit-rate & price filters."
+        legs: goblins,
+        why: "All qualifying Goblins with positive Edge Gaps that pass strict hit-rate filters, sorted by edge gap value."
       });
     }
   
     // Mixed Trio (3-pick): top 2 Goblins + best Regular
+    const top2Goblins = topByGap(rows.filter(r => r.approvalTag==="✅ Goblin"), 2);
     const reg1 = topByGap(rows.filter(r => r.approvalTag==="✅ Regular"), 1);
-    if (core2.length === 2 && reg1.length === 1) {
-      const trio = uniqueByPlayer([...core2, ...reg1]).slice(0,3);
+    if (top2Goblins.length === 2 && reg1.length === 1) {
+      const trio = uniqueByPlayer([...top2Goblins, ...reg1]).slice(0,3);
       if (trio.length === 3) {
         const pEsts = trio.map(estPEstForRow).filter(Number.isFinite);
         const pWin = pEsts.length===3 ? product(pEsts) : null;
