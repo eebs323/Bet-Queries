@@ -225,11 +225,24 @@ const CompetitionId = {
   function latestSeason(seasons) { return seasons.reduce((a,b)=>(+b.year>+a.year?b:a)); }
   function getTeamFromSeason(season, teamId) { return season?.teams?.find(t => t.teamId == teamId) || null; }
   function getStatArrayForLeague(team, league, propType) {
-    const overall = team?.rankings?.statRankings?.overall;
+    // Check if team has rankings data
+    if (!team?.rankings?.statRankings) return [];
+    
+    // Get overall rankings if they exist
+    const overall = team.rankings.statRankings.overall;
     if (!overall) return [];
+    
+    // For basketball, determine whether to use offense or defense stats
     if (league.type === "basketball") {
-      return league.offenseProps.has(propType) ? (overall.offense || []) : (overall.defense || []);
+      // Use offense stats for offensive props (steals, blocks, etc)
+      if (league.offenseProps.has(propType)) {
+        return overall.offense || [];
+      }
+      // Use defense stats for defensive props
+      return overall.defense || [];
     }
+    
+    // For other sports, default to defense stats
     return overall.defense || [];
   }
   function rankForStatKey(stats, key) {
@@ -254,22 +267,38 @@ const CompetitionId = {
   
   // ---------- Unified ranking ----------
   function getOpponentDefenseRanking(playerTeamId, eventId, propType) {
+    // Get opponent team ID
     const opponentTeamId = findOpponentTeam(playerTeamId, eventId);
     if (!opponentTeamId) return "N/A";
   
+    // Get league configuration
     const league = getLeagueConfig(leagueType);
     const envYear = pm.environment.get(league.seasonEnv);
     const preferredYear = envYear || league.defaultYear;
   
+    // Get current season data
     const season = pickSeasonFromContent(leagueType, defensiveStats?.content, competitionId, preferredYear);
     if (!season) return "N/A";
   
+    // Find opponent team in season data
     const team = getTeamFromSeason(season, opponentTeamId);
     if (!team) return "N/A";
   
-    const stats = getStatArrayForLeague(team, league, propType);
-    if (league.type === "basketball" && propType === "FANTASY_SCORE_PP") return fantasyScoreRankBasketball(stats);
+    // Skip if team has no rankings data
+    if (!team.rankings || Object.keys(team.rankings).length === 0) return "N/A";
   
+    // Get appropriate stats array for the prop type
+    const stats = getStatArrayForLeague(team, league, propType);
+    if (!stats || stats.length === 0) return "N/A";
+  
+    // Special handling for fantasy score in basketball
+    if (league.type === "basketball" && propType === "FANTASY_SCORE_PP") {
+      const fsRank = fantasyScoreRankBasketball(stats);
+      if (fsRank === "N/A") return "N/A";
+      return fsRank;
+    }
+  
+    // Get the stat key for this prop type
     const statKey = (league.statMap && league.statMap[propType]) || (STAT_MAP_BASKETBALL[propType]) || null;
     return rankForStatKey(stats, statKey);
   }
@@ -280,11 +309,13 @@ const CompetitionId = {
       const comp = content.competitions?.find(c => c.competitionId === competitionId);
       const seasons = comp?.seasons || [];
       const season = latestSeason(seasons);
-      return season?.teams?.length || 0;
+      // Only count teams that have rankings data
+      return season?.teams?.filter(t => t.rankings && Object.keys(t.rankings).length > 0)?.length || 0;
     }
     const seasons = content.seasons || [];
     const season = latestSeason(seasons);
-    return season?.teams?.length || 0;
+    // Only count teams that have rankings data
+    return season?.teams?.filter(t => t.rankings && Object.keys(t.rankings).length > 0)?.length || 0;
   }
   function defenseClassForRank(rank, isOver, leagueType) {
     const r = parseFloat(rank);
