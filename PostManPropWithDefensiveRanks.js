@@ -543,19 +543,21 @@ const CompetitionId = {
   
   function approvalTagFor(item) {
     const blended = getBlendedStats(item.stats || {});
-    const isGoblin = item.outcome.bookOdds.PRIZEPICKS?.identifier?.bookProps?.odds_type === "goblin" || 
-                     item.outcome.bookOdds.PRIZEPICKS?.identifier?.bookProps?.odds_label === "👿";
-
-    if (isGoblin && isSafeGoblin(blended)) return "✅ Goblin";
-    if (!isGoblin && (isPlayoffs ? isSafeRegularPlayoffs(item) : isSafeRegular(blended))) return "✅ Regular";
+    if (isGoblinProp(item.outcome) && isSafeGoblin(blended)) return "✅ Goblin";
+    if (!isGoblinProp(item.outcome) && (isPlayoffs ? isSafeRegularPlayoffs(item) : isSafeRegular(blended))) return "✅ Regular";
     return "⚠ Trend mismatch";
   }
   
-  // ---------- Map props ----------
-  function mapProps(item, filterType) {
+// Helper function to check if a prop is a goblin
+function isGoblinProp(outcome) {
+    return outcome?.bookOdds?.PRIZEPICKS?.identifier?.bookProps?.odds_type === "goblin" || 
+           outcome?.bookOdds?.PRIZEPICKS?.identifier?.bookProps?.odds_label === "👿";
+}
+
+// ---------- Map props ----------
+function mapProps(item, filterType) {
     const { outcome, stats: raw } = item;
     const stats = getBlendedStats(raw);
-  
     const isPrizePicks = outcome.bookOdds.PRIZEPICKS !== undefined;
     const isSleeper    = outcome.bookOdds.SLEEPER   !== undefined;
     const allowedDFS   = showPrizePicksOnly ? isPrizePicks : (isPrizePicks || isSleeper);
@@ -726,8 +728,9 @@ const CompetitionId = {
   }
   
   function buildAllRegularPairs(rows) {
-    const regularsPos = rows
-      .filter(r => r.approvalTag === "✅ Regular" && typeof r.edgeGapPct === "number" && r.edgeGapPct > 0);
+    const regularsPos = rows.filter(r => 
+        !isGoblinProp(r.outcome) && typeof r.edgeGapPct === "number" && r.edgeGapPct > 0
+    );
   
     // Unique by player first
     const uniq = uniqueByPlayer(regularsPos);
@@ -1008,9 +1011,10 @@ function getRiskLevel(legs) {
 function buildRecommendedSlips(rows) {
     const slips = [];
   
-    // Get all safe goblins with positive edge gaps, sorted by gap value
-    const goblins = rows.filter(r => r.approvalTag === "✅ Goblin" && typeof r.edgeGapPct === "number" && r.edgeGapPct > 0)
-      .sort((a, b) => b.edgeGapPct - a.edgeGapPct);
+    // Get all goblins with positive edge gaps, sorted by gap value
+    const goblins = rows.filter(r => 
+        isGoblinProp(r.outcome) && typeof r.edgeGapPct === "number" && r.edgeGapPct > 0
+    ).sort((a, b) => b.edgeGapPct - a.edgeGapPct);
 
     // If we have any goblins, create a single slip with all of them
     if (goblins.length > 0) {
@@ -1047,8 +1051,12 @@ function buildRecommendedSlips(rows) {
     }
   
     // Mixed Trio (3-pick): top 2 Goblins + best Regular
-    const top2Goblins = topByGap(rows.filter(r => r.approvalTag==="✅ Goblin"), 2);
-    const reg1 = topByGap(rows.filter(r => r.approvalTag==="✅ Regular"), 1);
+    const top2Goblins = topByGap(goblins, 2);
+    // Get regulars (non-goblins) with positive edge gaps
+    const regulars = rows.filter(r => 
+        !isGoblinProp(r.outcome) && typeof r.edgeGapPct === "number" && r.edgeGapPct > 0
+    );
+    const reg1 = topByGap(regulars, 1);
     if (top2Goblins.length === 2 && reg1.length === 1) {
       const trio = uniqueByPlayer([...top2Goblins, ...reg1]).slice(0,3);
       if (trio.length === 3) {
