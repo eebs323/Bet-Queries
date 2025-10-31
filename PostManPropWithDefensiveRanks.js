@@ -36,7 +36,7 @@ const CompetitionId = {
       .meta { font-size: 12px; color: #555; margin-bottom: 8px; }
       .legs { margin: 0; padding-left: 18px; }
       .legs li { margin: 8px 0; }
-      .legs li .gap { color: #555; font-size: 12px; }
+      .legs li .gap { color: #555; font-size: 12px; display: block; margin-top: 2px; }
       .legs li .detail { display: block; font-size: 12px; color: #666; margin-top: 2px; line-height: 1.4; }
       .legs li .defense { font-weight: bold; }
       .legs li .defense.green-text { color: #008000; }
@@ -50,9 +50,9 @@ const CompetitionId = {
       .rating-pill.high { background: #e6ffe6; color: #008000; }
       .rating-pill.medium { background: #fff3e6; color: #ff8c00; }
       .rating-pill.low { background: #ffe6e6; color: #ff0000; }
-      .trend-up { color: #008000; }
-      .trend-down { color: #ff0000; }
-      .trend-neutral { color: #ff8c00; }
+      .trend-up { color: #008000; font-weight: bold; }
+      .trend-down { color: #ff0000; font-weight: bold; }
+      .trend-neutral { color: #ff8c00; font-weight: bold; }
       .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 4px; margin-top: 4px; }
       .stat-item { font-size: 11px; }
     </style>
@@ -122,9 +122,8 @@ const CompetitionId = {
         <ol class="legs">
           {{#each legs}}
             <li>
-              {{player}} 
-              <span class="gap">({{edgeNote}})</span>
-              <span class="{{trendClass}}">{{trendIndicator}}</span>
+              {{#if isGoblin}}👿 {{/if}}<span class="{{trendClass}}">{{trendIndicator}}</span> {{playerName}} - {{type}} {{line}} vs {{opponentName}}
+              <span class="gap">{{edgeNote}}</span>
               <div class="detail">
                 {{type}} {{line}}
                 <div class="stats-grid">
@@ -806,13 +805,23 @@ const CompetitionId = {
         incrementPlayerCount(bestPartner);
         markPairAsUsed(firstPlayer, bestPartner);
 
+        const pair = [firstPlayer, bestPartner];
+        const totalGap = pair.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
+        const { rating, ratingClass } = calculateSlipRating(pair);
+        const { riskLevel, riskClass } = getRiskLevel(pair);
+        
         out.push({
           title: `Regular Value (2-pick) #${out.length + 1}`,
           size: 2,
           bucket: "Regular",
           sortBasis: "Mix + Edge Gap",
           pctWin: pWin ? pct(pWin) : "—",
-          legs: [firstPlayer, bestPartner],
+          legs: pair.map(leg => formatLegForDisplay(leg)),
+          totalGap,
+          rating,
+          ratingClass,
+          riskLevel,
+          riskClass,
           why: "Both legs show positive Edge Gap; pairing mixes risk profile (sides/teams/periods) when available."
         });
       }
@@ -1045,13 +1054,22 @@ function buildRecommendedSlips(rows) {
       if (trio.length === 3) {
         const pEsts = trio.map(estPEstForRow).filter(Number.isFinite);
         const pWin = pEsts.length===3 ? product(pEsts) : null;
+        const totalGap = trio.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
+        const { rating, ratingClass } = calculateSlipRating(trio);
+        const { riskLevel, riskClass } = getRiskLevel(trio);
+        
         slips.push({
           title: "Mixed Trio (3-pick)",
           size: 3,
           bucket: "Mixed",
           sortBasis: "Edge Gap",
           pctWin: pWin ? pct(pWin) : "—",
-          legs: trio,
+          legs: trio.map(leg => formatLegForDisplay(leg)),
+          totalGap,
+          rating,
+          ratingClass,
+          riskLevel,
+          riskClass,
           why: "Blend of two high-edge Goblins plus the top Regular to diversify risk across props."
         });
       }
@@ -1066,6 +1084,32 @@ function buildRecommendedSlips(rows) {
     if (mega) slips.push(mega);
   
     return slips;
+  }
+  
+  // Format leg display consistently across all slip types
+  function formatLegForDisplay(leg) {
+    // Split the original player string to extract components
+    const parts = leg.player.split(" vs ");
+    const playerInfo = parts[0];
+    const opponentName = parts[1];
+    
+    // Check if it's a goblin prop
+    const isGoblin = leg.approvalTag === "✅ Goblin";
+    
+    // Get trend indicator
+    const trendIndicator = getTrendIndicator(leg);
+    
+    // Strip any existing prefixes and get clean player name
+    const cleanPlayerName = playerInfo.replace(/^(👿\s*)?(PP:|SL:|O:)?\s*(\[(?:Over|Under)\]\s*)?/, "");
+    
+    return {
+      ...leg,
+      isGoblin,
+      playerName: cleanPlayerName,
+      opponentName,
+      trendIndicator,
+      trendClass: trendIndicator === '↑' ? 'trend-up' : trendIndicator === '↓' ? 'trend-down' : 'trend-neutral'
+    };
   }
   
   // ---------- Constants ----------
