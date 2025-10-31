@@ -443,12 +443,14 @@ const CompetitionId = {
     if (!windows.length) return null;
   
     const isOver = outcome.outcomeLabel === "Over";
+    
+    // For both Overs and Unders, we want the window that shows the strongest trend
     const chosen = isOver
       ? windows.reduce((a,b) => (+b[1] > +a[1] ? b : a))
       : windows.reduce((a,b) => (+b[1] < +a[1] ? b : a));
   
     const pOver = Math.max(0, Math.min(1, Number(chosen[1])));
-    const pEst  = isOver ? pOver : (1 - pOver);
+    const pEst = isOver ? pOver : (1 - pOver);
   
     return { label: chosen[0], value: Number(chosen[1]), pEst };
   }
@@ -518,14 +520,36 @@ const CompetitionId = {
   
   // ---------- Approval ----------
   function isSafeRegular(stats) {
-    if (stats.curSeason < .54 || stats.h2h == null || stats.h2h < 0.66 || (stats.l5 < stats.l10 || stats.l10 < (stats.l20 * .9))) return 0;
-    let hits=0;
+    // Early disqualification for null H2H
+    if (stats.h2h == null) return 0;
+    
+    // Strong trend check - if recent performance is exceptional
+    const hasStrongTrend = stats.l5 >= 0.8 && stats.l10 >= 0.8;
+    
+    // If we have a strong recent trend, be more lenient with other checks
+    if (hasStrongTrend && stats.h2h >= 0.6) {
+        return true;
+    }
+    
+    // Regular checks for non-strong-trend cases
+    if (stats.curSeason < .54 || stats.h2h < 0.66) return 0;
+    
+    let hits = 0;
     if (stats.l20 >= 0.5) hits++;
     if (stats.l10 >= 0.6) hits++;
     if (stats.l5 >= 0.6) hits++;
     if (stats.h2h >= 0.80) hits++;
     if (stats.curSeason >= 0.55) hits++;
-    if (stats.l5 >= stats.l10 && stats.l10 > stats.l20) hits++;
+    
+    // Trend direction check
+    if (stats.l5 >= stats.l10 && stats.l10 >= stats.l20) hits++;
+    
+    // Check for extreme low values only if we don't have a strong trend
+    if (!hasStrongTrend) {
+        const hasExtremeLow = [stats.l5, stats.l10, stats.l20, stats.curSeason].some(val => val < 0.3);
+        if (hasExtremeLow) return 0;
+    }
+    
     return hits >= 5;
   }
   function isSafeRegularPlayoffs(item) { let s=item.stats; return !(s.l5<.6 || s.h2h<=.6); }
@@ -550,8 +574,15 @@ const CompetitionId = {
   
 // Helper function to check if a prop is a goblin
 function isGoblinProp(outcome) {
-    return outcome?.bookOdds?.PRIZEPICKS?.identifier?.bookProps?.odds_type === "goblin" || 
-           outcome?.bookOdds?.PRIZEPICKS?.identifier?.bookProps?.odds_label === "👿";
+    // Check for goblin indicators in PrizePicks odds
+    const isPPGoblin = outcome?.bookOdds?.PRIZEPICKS?.identifier?.bookProps?.odds_type === "goblin" || 
+                      outcome?.bookOdds?.PRIZEPICKS?.identifier?.bookProps?.odds_label === "👿";
+    
+    // Also check the odds value itself
+    const ppOdds = parseFloat(outcome?.bookOdds?.PRIZEPICKS?.odds);
+    const isGoblinOdds = ppOdds === -137;
+    
+    return isPPGoblin || isGoblinOdds;
 }
 
 // ---------- Map props ----------
@@ -1019,47 +1050,43 @@ function getRiskLevel(legs) {
 function buildRecommendedSlips(rows) {
     const slips = [];
   
-    // Get all goblins with positive edge gaps, sorted by gap value
-    const goblins = rows.filter(r => 
-        isGoblinProp(r.outcome) && typeof r.edgeGapPct === "number" && r.edgeGapPct > 0
-    ).sort((a, b) => b.edgeGapPct - a.edgeGapPct);
+    // Get all safe goblins with positive edge gaps, sorted by gap value
+    const safeGoblins = rows.filter(r => {
+        // First check if it's a goblin prop
+        if (!isGoblinProp(r.outcome)) return false;
+        // Then check if it has a valid positive edge gap
+        if (r.edgeGapPct <= 0) return false;
+        // Finally check if it passes safety criteria
+        const stats = getBlendedStats(r.stats || {});
+        return isPlayoffs ? isSafeGoblinPlayoffs(r) : isSafeGoblin(stats);
+    }).sort((a, b) => b.edgeGapPct - a.edgeGapPct);
 
-    // If we have any goblins, create a single slip with all of them
-    if (goblins.length > 0) {
-      const pEsts = goblins.map(estPEstForRow).filter(Number.isFinite);
-      const pWin = pEsts.length === goblins.length ? product(pEsts) : null;
-      const totalGap = goblins.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
-      const { rating, ratingClass } = calculateSlipRating(goblins);
-      const { riskLevel, riskClass } = getRiskLevel(goblins);
+    // If we have any safe goblins, create a single slip with all of them
+    if (safeGoblins.length > 0) {
+      const pEsts = safeGoblins.map(estPEstForRow).filter(Number.isFinite);
+      const pWin = pEsts.length === safeGoblins.length ? product(pEsts) : null;
+      const totalGap = safeGoblins.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
+      const { rating, ratingClass } = calculateSlipRating(safeGoblins);
+      const { riskLevel, riskClass } = getRiskLevel(safeGoblins);
       
       slips.push({
-        title: `Goblin Core (${goblins.length}-pick)`,
-        size: goblins.length,
+        title: `Safe Goblins (${safeGoblins.length}-pick)`,
+        size: safeGoblins.length,
         bucket: "Goblin",
         sortBasis: "Edge Gap",
         pctWin: pWin ? pct(pWin) : "—",
-        legs: goblins.map(leg => {
-          const trendIndicator = getTrendIndicator(leg);
-          let trendClass = 'trend-neutral';
-          if (trendIndicator === '↑') trendClass = 'trend-up';
-          else if (trendIndicator === '↓') trendClass = 'trend-down';
-          return {
-            ...leg,
-            trendIndicator,
-            trendClass
-          };
-        }),
+        legs: safeGoblins.map(leg => formatLegForDisplay(leg)),
         totalGap,
         rating,
         ratingClass,
         riskLevel,
         riskClass,
-        why: "All qualifying Goblins with positive Edge Gaps that pass strict hit-rate filters, sorted by gap value."
+        why: "All qualifying Goblins with positive Edge Gaps that pass strict hit-rate filters. For playoffs: L5≥0.6 and H2H≥0.9. For regular season: L20/L10/L5/CurSeason≥0.7 and H2H≥0.7."
       });
     }
   
-    // Mixed Trio (3-pick): top 2 Goblins + best Regular
-    const top2Goblins = topByGap(goblins, 2);
+    // Mixed Trio (3-pick): top 2 Safe Goblins + best Regular
+    const top2Goblins = topByGap(safeGoblins, 2);
     // Get regulars (non-goblins) with positive edge gaps
     const regulars = rows.filter(r => 
         !isGoblinProp(r.outcome) && typeof r.edgeGapPct === "number" && r.edgeGapPct > 0
