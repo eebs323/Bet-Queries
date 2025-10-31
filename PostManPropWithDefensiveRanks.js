@@ -863,78 +863,105 @@ function mapProps(item, filterType) {
     return out;
   }
   
-  // Build one mega slip (prefer 6; fallback to 5→4→3) using strongest positive gaps,
+  // Build one mega slip (prefer 6; fallback to 5→4→3) using weighted scoring system,
   // mixing Goblins and Regulars and enforcing unique players.
   function buildMegaSlip(rows) {
-    // Calculate a score for each regular prop that factors in both H2H and edge gap
-    const scoreProp = (prop) => {
-      const h2hValue = Number(prop.h2h) || 0;
-      const edgeGap = Number(prop.edgeGapPct) || 0;
-      // Weight H2H more heavily in the scoring
-      return (h2hValue * 2) + edgeGap;
-    };
+    // Calculate weighted score for each prop based on multiple factors
+    function calculateScore(prop) {
+      // Must have H2H data and positive edge gap
+      if (!prop.h2h || !prop.edgeGapPct || prop.edgeGapPct <= 0) return -1;
+      
+      let score = 0;
+      
+      // Core stats weighted scoring (total 100%)
+      score += (Number(prop.h2h) || 0) * 0.30;        // H2H: 30%
+      score += (prop.edgeGapPct / 12) * 0.20;         // Edge gap: 20% (normalized to typical 12% max)
+      score += (Number(prop.l5) || 0) * 0.20;         // L5: 20%
+      score += (Number(prop.l10) || 0) * 0.15;        // L10: 15%
+      score += (Number(prop.curSeason) || 0) * 0.10;  // Current season: 10%
+      
+      // Defense rank bonus (5%)
+      const dRank = prop.defenseRank;
+      if (dRank && dRank !== "N/A") {
+        const normalizedDRank = (30 - parseInt(dRank)) / 30;  // Invert so higher is better
+        score += normalizedDRank * 0.05;
+      }
+      
+      // Bonus points for trends
+      if ((Number(prop.l5) || 0) > (Number(prop.l10) || 0)) score += 0.05;  // Improving recent form
+      if ((Number(prop.l10) || 0) > (Number(prop.curSeason) || 0)) score += 0.05;  // Overall improving trend
+      if ((Number(prop.l5) || 0) >= 0.7) score += 0.1;  // Strong recent performance
+      
+      return score;
+    }
 
-    // Only get regular props with positive edge gaps, sorted by combined score
-    const regulars = uniqueByPlayer(
-      rows.filter(r => r.approvalTag === "✅ Regular" && 
-                      typeof r.edgeGapPct === "number" && 
-                      r.edgeGapPct > 0 &&
-                      r.h2h !== null)  // Ensure H2H data exists
-          .sort((a,b) => scoreProp(b) - scoreProp(a))
+    // Score and filter props
+    const scoredProps = uniqueByPlayer(
+      rows.filter(r => r.approvalTag === "✅ Regular")  // Only safe regulars
+          .map(r => ({ ...r, score: calculateScore(r) }))
+          .filter(r => r.score > 0)  // Must have valid score
+          .sort((a, b) => {
+            // Primary sort by weighted score
+            if (b.score !== a.score) return b.score - a.score;
+            
+            // Secondary sort by trend (L5 vs L10 change)
+            const trendA = ((Number(a.l5) || 0) - (Number(a.l10) || 0));
+            const trendB = ((Number(b.l5) || 0) - (Number(b.l10) || 0));
+            return trendB - trendA;
+          })
     );
-  
-    if (regulars.length === 0) return null;
-  
+
+    if (scoredProps.length === 0) return null;
+
+    // Build slip prioritizing diversity
     let legs = [];
-    // Try to build diverse set of regular props
-    for (const r of regulars) {
+    
+    // First pass: Build diverse set of high-scoring props
+    for (const prop of scoredProps) {
       if (legs.length >= 6) break;
-      // avoid duplicate team + period + side if possible
-      if (!legs.find(x => x._teamId===r._teamId && x.periodLabel===r.periodLabel && x._isOver===r._isOver)) {
-        legs.push(r);
+      // Avoid duplicate team + period + side combinations when possible
+      if (!legs.find(x => 
+          x._teamId === prop._teamId && 
+          x.periodLabel === prop.periodLabel && 
+          x._isOver === prop._isOver
+      )) {
+        legs.push(prop);
       }
     }
-    // Add any remaining high-scoring regulars if needed
-    for (const r of regulars) {
+
+    // Second pass: Fill remaining slots with highest scoring props
+    for (const prop of scoredProps) {
       if (legs.length >= 6) break;
-      if (!legs.find(x => x.player.replace(/\s+\(.+?\)$/,'') === r.player.replace(/\s+\(.+?\)$/,''))) {
-        legs.push(r);
+      if (!legs.includes(prop)) {
+        legs.push(prop);
       }
     }
-  
-    // Fallback sizes if we couldn't reach 6
-    const targetSizes = [6,5,4,3];
+
+    // Determine final slip size (6→5→4→3)
+    const targetSizes = [6, 5, 4, 3];
     let chosenSize = targetSizes.find(sz => legs.length >= sz);
     legs = legs.slice(0, chosenSize);
-    
-    // Sort final legs by combined score (H2H weighted more heavily)
-    legs.sort((a,b) => {
-      const scoreA = (Number(a.h2h) || 0) * 2 + (Number(a.edgeGapPct) || 0);
-      const scoreB = (Number(b.h2h) || 0) * 2 + (Number(b.edgeGapPct) || 0);
-      return scoreB - scoreA;
-    });
-    
+
+    // Calculate slip metrics
     const pEsts = legs.map(estPEstForRow).filter(Number.isFinite);
-    const pWin = pEsts.length===legs.length ? product(pEsts) : null;
-    const totalGap = legs.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
-    const avgH2H = legs.reduce((sum, prop) => sum + (Number(prop.h2h) || 0), 0) / legs.length;
-  
+    const pWin = pEsts.length === legs.length ? product(pEsts) : null;
+    const totalGap = legs.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0);
+    const avgScore = legs.reduce((sum, prop) => sum + prop.score, 0) / legs.length;
+
     const { rating, ratingClass } = calculateSlipRating(legs);
     const { riskLevel, riskClass } = getRiskLevel(legs);
 
     return {
-      title: `Mega Regular Slip (${legs.length}-pick) - Total Gap: ${totalGap}, Avg H2H: ${avgH2H.toFixed(2)}`,
-      size: chosenSize,
-      bucket: "Regular",
-      sortBasis: "H2H + Edge Gaps",
-      pctWin: pWin ? pct(pWin) : "—",
+      title: `🎯 Mega ${legs.length}-Pick Slip`,
       legs: legs.map(leg => formatLegForDisplay(leg)),
-      totalGap,
+      pctWin: pWin ? pct(pWin) : "—",
+      totalGap: Math.round(totalGap),
+      avgScore: (avgScore * 10).toFixed(1),
       rating,
       ratingClass,
       riskLevel,
       riskClass,
-      why: "Top regular props prioritizing high H2H values and positive Edge Gaps, with diversity across sides/teams/periods. Props sorted by combined H2H and gap score."
+      why: "Props scored using weighted system: H2H (30%), Edge Gap (20%), L5 (20%), L10 (15%), Season (10%), Defense (5%). Bonus for improving trends."
     };
   }
   
