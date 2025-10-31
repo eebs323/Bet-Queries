@@ -888,13 +888,21 @@ function mapProps(item, filterType) {
     const totalGap = legs.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
     const avgH2H = legs.reduce((sum, prop) => sum + (Number(prop.h2h) || 0), 0) / legs.length;
   
+    const { rating, ratingClass } = calculateSlipRating(legs);
+    const { riskLevel, riskClass } = getRiskLevel(legs);
+
     return {
       title: `Mega Regular Slip (${legs.length}-pick) - Total Gap: ${totalGap}, Avg H2H: ${avgH2H.toFixed(2)}`,
       size: chosenSize,
       bucket: "Regular",
       sortBasis: "H2H + Edge Gaps",
       pctWin: pWin ? pct(pWin) : "—",
-      legs,
+      legs: legs.map(leg => formatLegForDisplay(leg)),
+      totalGap,
+      rating,
+      ratingClass,
+      riskLevel,
+      riskClass,
       why: "Top regular props prioritizing high H2H values and positive Edge Gaps, with diversity across sides/teams/periods. Props sorted by combined H2H and gap score."
     };
   }
