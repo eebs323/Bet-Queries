@@ -35,13 +35,26 @@ const CompetitionId = {
       .card h3 .prob { font-size: 14px; color: #555; }
       .meta { font-size: 12px; color: #555; margin-bottom: 8px; }
       .legs { margin: 0; padding-left: 18px; }
-      .legs li { margin: 4px 0; }
+      .legs li { margin: 8px 0; }
       .legs li .gap { color: #555; font-size: 12px; }
       .legs li .detail { display: block; font-size: 12px; color: #666; margin-top: 2px; line-height: 1.4; }
       .legs li .defense { font-weight: bold; }
       .legs li .defense.green-text { color: #008000; }
       .legs li .defense.orange-text { color: #ff8c00; }
       .legs li .defense.red-text { color: #ff0000; }
+      
+      /* New styles */
+      .card-header { margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #eee; }
+      .card-rating { display: flex; gap: 8px; margin-top: 4px; }
+      .rating-pill { font-size: 11px; padding: 2px 8px; border-radius: 12px; background: #f5f5f5; }
+      .rating-pill.high { background: #e6ffe6; color: #008000; }
+      .rating-pill.medium { background: #fff3e6; color: #ff8c00; }
+      .rating-pill.low { background: #ffe6e6; color: #ff0000; }
+      .trend-up { color: #008000; }
+      .trend-down { color: #ff0000; }
+      .trend-neutral { color: #ff8c00; }
+      .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 4px; margin-top: 4px; }
+      .stat-item { font-size: 11px; }
     </style>
   
     <div class="table-wrap">
@@ -91,15 +104,41 @@ const CompetitionId = {
     <div class="cards">
       {{#each slips}}
       <div class="card">
-        <h3>
-          {{title}}
-          <span class="prob">{{pctWin}}%</span>
-        </h3>
+        <div class="card-header">
+          <h3>
+            {{title}}
+            <span class="prob">{{pctWin}}%</span>
+          </h3>
+          <div class="card-rating">
+            <span class="rating-pill {{ratingClass}}">
+              Rating: {{rating}}/10
+            </span>
+            <span class="rating-pill">Gap: {{totalGap}}%</span>
+            <span class="rating-pill {{riskClass}}">
+              Risk: {{riskLevel}}
+            </span>
+          </div>
+        </div>
         <ol class="legs">
           {{#each legs}}
             <li>
-              {{player}} <span class="gap">({{edgeNote}})</span>
-              <span class="detail">{{type}} {{line}} · L20: <span class="{{l20Color}}">{{l20}}</span> · L10: <span class="{{l10Color}}">{{l10}}</span> · L5: <span class="{{l5Color}}">{{l5}}</span> · H2H: <span class="{{h2hColor}}">{{h2h}}</span> · Szn25: <span class="{{curSeasonColor}}">{{curSeason}}</span> · Szn24: <span class="{{prevSeasonColor}}">{{prevSeason}}</span>{{#if defenseRank}} · VS: <span class="defense {{defenseClass}}">{{defenseRank}}</span>{{/if}}</span>
+              {{player}} 
+              <span class="gap">({{edgeNote}})</span>
+              <span class="{{trendClass}}">{{trendIndicator}}</span>
+              <div class="detail">
+                {{type}} {{line}}
+                <div class="stats-grid">
+                  <div class="stat-item">L20: <span class="{{l20Color}}">{{l20}}</span></div>
+                  <div class="stat-item">L10: <span class="{{l10Color}}">{{l10}}</span></div>
+                  <div class="stat-item">L5: <span class="{{l5Color}}">{{l5}}</span></div>
+                  <div class="stat-item">H2H: <span class="{{h2hColor}}">{{h2h}}</span></div>
+                  <div class="stat-item">Szn25: <span class="{{curSeasonColor}}">{{curSeason}}</span></div>
+                  <div class="stat-item">Szn24: <span class="{{prevSeasonColor}}">{{prevSeason}}</span></div>
+                  {{#if defenseRank}}
+                  <div class="stat-item">VS: <span class="defense {{defenseClass}}">{{defenseRank}}</span></div>
+                  {{/if}}
+                </div>
+              </div>
             </li>
           {{/each}}
         </ol>
@@ -539,7 +578,11 @@ const CompetitionId = {
           h2hColor=trendClass(stats.h2h), curSeasonColor=trendClass(stats.curSeason), prevSeasonColor=trendClass(raw?.prevSeason),
           favorableColor = trendClass(item.orfScore);
   
-    const playerPrefix = isPrizePicks ? "" : (isSleeper ? "SL: " : "O:");
+    const isGoblin = item.outcome.bookOdds.PRIZEPICKS?.identifier?.bookProps?.odds_type === "goblin" || 
+                     item.outcome.bookOdds.PRIZEPICKS?.identifier?.bookProps?.odds_label === "👿";
+    const goblinPrefix = isGoblin ? "👿 " : "";
+    const bookPrefix = isPrizePicks ? "" : (isSleeper ? "SL: " : "O:");
+    const typePrefix = `[${outcome.outcomeLabel}] `;
     const periodLabel  = outcome.periodLabel || "Full";
     const approvalTag  = approvalTagFor(item);
     const avgOdds = getAvgOdds(item);
@@ -548,7 +591,7 @@ const CompetitionId = {
   
     return includeItem ? {
       // display
-      player: `${playerPrefix}${outcome.marketLabel} vs ${opponentTeamName}`,
+      player: `${goblinPrefix}${bookPrefix}${typePrefix}${outcome.marketLabel} vs ${opponentTeamName}`,
       type: outcome.outcomeLabel,
       periodLabel,
       line: outcome.line,
@@ -844,7 +887,116 @@ const CompetitionId = {
     };
   }
   
-  function buildRecommendedSlips(rows) {
+  function calculateSlipRating(legs) {
+    let score = 0;
+    for (const leg of legs) {
+        // Get base stats
+        const h2h = Number(leg.h2h) || 0;
+        const l5 = Number(leg.l5) || 0;
+        const l10 = Number(leg.l10) || 0;
+        const prevSeason = Number(leg.prevSeason) || 0;
+        const edgeGap = leg.edgeGapPct || 0;
+        const defRank = Number(leg.defenseRank);
+        
+        if (isEarlySeason) {
+            // Early season weighting
+            score += h2h * 0.35;           // H2H (35%) - most reliable early
+            score += l5 * 0.25;            // L5 (25%) - recent form
+            score += prevSeason * 0.20;     // Last season (20%) - historical baseline
+            score += edgeGap * 0.15;        // Edge gap (15%)
+            if (defRank && defRank <= 10) score += 0.05;  // Defense (5%)
+            
+            // Early season bonus for improvement
+            const improvement = l5 - prevSeason;
+            if (improvement > 0.1) score += 0.1;
+        } else {
+            // Regular season weighting
+            score += h2h * 0.25;           // H2H (25%)
+            score += l5 * 0.20;            // L5 (20%)
+            score += l10 * 0.15;           // L10 (15%)
+            score += edgeGap * 0.25;       // Edge gap (25%)
+            if (defRank && defRank <= 10) score += 0.15;  // Defense (15%)
+        }
+    }
+    
+    // Average per leg and convert to 0-10 scale
+    const rating = Math.round((score / legs.length) * 10);
+    
+    // Generate rating class - stricter thresholds for early season
+    let ratingClass = 'low';
+    if (isEarlySeason) {
+        if (rating >= 8) ratingClass = 'high';       // More demanding early season
+        else if (rating >= 6) ratingClass = 'medium';
+    } else {
+        if (rating >= 7) ratingClass = 'high';       // Regular season thresholds
+        else if (rating >= 5) ratingClass = 'medium';
+    }
+    
+    return { rating, ratingClass };
+}
+
+function getTrendIndicator(leg) {
+    const l5 = Number(leg.l5) || 0;
+    const l10 = Number(leg.l10) || 0;
+    if (l5 > l10 * 1.1) return "↑";
+    if (l5 < l10 * 0.9) return "↓";
+    return "→";
+}
+
+function getRiskLevel(legs) {
+    const avgStats = legs.reduce((acc, leg) => {
+        acc.h2h += Number(leg.h2h) || 0;
+        acc.prevSeason += Number(leg.prevSeason) || 0;
+        acc.l5 += Number(leg.l5) || 0;
+        acc.l10 += Number(leg.l10) || 0;
+        acc.edgeGap += Number(leg.edgeGapPct) || 0;
+        return acc;
+    }, { h2h: 0, prevSeason: 0, l5: 0, l10: 0, edgeGap: 0 });
+    
+    // Convert to averages
+    const len = legs.length;
+    avgStats.h2h /= len;
+    avgStats.prevSeason /= len;
+    avgStats.l5 /= len;
+    avgStats.l10 /= len;
+    avgStats.edgeGap /= len;
+    
+    let riskLevel, riskClass;
+    
+    if (isEarlySeason) {
+        // Early season risk criteria - more conservative
+        if (avgStats.h2h > 0.85 && avgStats.prevSeason > 0.7 && avgStats.l5 >= avgStats.prevSeason) {
+            // Low risk if: Strong H2H, good last season, maintaining or improving form
+            riskLevel = "LOW";
+            riskClass = "high";
+        } else if (avgStats.h2h > 0.75 && avgStats.prevSeason > 0.6 && avgStats.l5 > 0.6) {
+            // Medium risk if: Good H2H, decent last season, acceptable current form
+            riskLevel = "MEDIUM";
+            riskClass = "medium";
+        } else {
+            riskLevel = "HIGH";
+            riskClass = "low";
+        }
+    } else {
+        // Regular season risk criteria - more balanced
+        if (avgStats.h2h > 0.75 && avgStats.l10 > 0.65 && avgStats.edgeGap > 12) {
+            // Low risk if: Good H2H, consistent recent form, strong edge
+            riskLevel = "LOW";
+            riskClass = "high";
+        } else if (avgStats.h2h > 0.65 && avgStats.l5 > 0.6 && avgStats.edgeGap > 8) {
+            // Medium risk if: Decent H2H, good recent form, solid edge
+            riskLevel = "MEDIUM";
+            riskClass = "medium";
+        } else {
+            riskLevel = "HIGH";
+            riskClass = "low";
+        }
+    }
+    
+    return { riskLevel, riskClass };
+}
+
+function buildRecommendedSlips(rows) {
     const slips = [];
   
     // Get all safe goblins with positive edge gaps, sorted by gap value
@@ -856,15 +1008,32 @@ const CompetitionId = {
       const pEsts = goblins.map(estPEstForRow).filter(Number.isFinite);
       const pWin = pEsts.length === goblins.length ? product(pEsts) : null;
       const totalGap = goblins.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
+      const { rating, ratingClass } = calculateSlipRating(goblins);
+      const { riskLevel, riskClass } = getRiskLevel(goblins);
       
       slips.push({
-        title: `Goblin Core (${goblins.length}-pick) - Total Gap: ${totalGap}`,
+        title: `Goblin Core (${goblins.length}-pick)`,
         size: goblins.length,
         bucket: "Goblin",
         sortBasis: "Edge Gap",
         pctWin: pWin ? pct(pWin) : "—",
-        legs: goblins,
-        why: "All qualifying Goblins with positive Edge Gaps that pass strict hit-rate filters, sorted by edge gap value."
+        legs: goblins.map(leg => {
+          const trendIndicator = getTrendIndicator(leg);
+          let trendClass = 'trend-neutral';
+          if (trendIndicator === '↑') trendClass = 'trend-up';
+          else if (trendIndicator === '↓') trendClass = 'trend-down';
+          return {
+            ...leg,
+            trendIndicator,
+            trendClass
+          };
+        }),
+        totalGap,
+        rating,
+        ratingClass,
+        riskLevel,
+        riskClass,
+        why: "All qualifying Goblins with positive Edge Gaps that pass strict hit-rate filters, sorted by gap value."
       });
     }
   
