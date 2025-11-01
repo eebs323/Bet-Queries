@@ -1213,14 +1213,19 @@ function getRiskLevel(legs) {
 function buildRecommendedSlips(rows) {
     const slips = [];
   
-    // Get all safe goblins with positive edge gaps, sorted by gap value
+    // Get all safe goblins with positive edge gaps, sorted by safety (H2H, L10, L5)
     const safeGoblins = rows.filter(r => {
         const isGoblin = r._isGoblin;
         if (!isGoblin) return false;
         if (!r.edgeGapPct || r.edgeGapPct <= 0) return false;
         const stats = getBlendedStats(r.stats || {});
         return isPlayoffs ? isSafeGoblinPlayoffs(r) : isSafeGoblin(stats);
-    }).sort((a, b) => b.edgeGapPct - a.edgeGapPct);
+    }).sort((a, b) => {
+        // Sort by safety: prioritize H2H, then L10, then L5, then edge
+        const safetyA = (a.h2h * 0.4) + (a.l10 * 0.3) + (a.l5 * 0.2) + (Math.min(100, a.edgeGapPct) / 100 * 0.1);
+        const safetyB = (b.h2h * 0.4) + (b.l10 * 0.3) + (b.l5 * 0.2) + (Math.min(100, b.edgeGapPct) / 100 * 0.1);
+        return safetyB - safetyA; // Highest safety first
+    });
     
     // Get all safe regulars with positive edge gaps
     const safeRegulars = rows.filter(r => {
