@@ -1,5 +1,15 @@
 // PostManPropWithDefensiveRanks + ALL Regular 2-pick slips + Mega slip (6→5→4→3)
 
+// Make pm available if running in Node.js environment
+if (typeof pm === 'undefined') {
+    global.pm = {
+        environment: { get: () => null },
+        globals: { get: () => "{}" },
+        visualizer: { set: () => {} },
+        response: { json: () => ({ props: [] }) }
+    };
+}
+
 // ---------- Leagues ----------
 const CompetitionId = {
     GBR_EPL: "GBR_EPL",
@@ -573,6 +583,7 @@ const CompetitionId = {
   }
   
 // Helper function to check if a prop is a goblin
+let goblinCheckCount = 0;
 function isGoblinProp(outcome) {
     // Check for goblin indicators in PrizePicks odds
     const isPPGoblin = outcome?.bookOdds?.PRIZEPICKS?.identifier?.bookProps?.odds_type === "goblin" || 
@@ -582,10 +593,22 @@ function isGoblinProp(outcome) {
     const ppOdds = parseFloat(outcome?.bookOdds?.PRIZEPICKS?.odds);
     const isGoblinOdds = ppOdds === -137;
     
-    return isPPGoblin || isGoblinOdds;
+    const result = isPPGoblin || isGoblinOdds;
+    
+    // Debug first few goblin checks
+    if (DEBUG_MODE && goblinCheckCount < 5 && result) {
+        goblinCheckCount++;
+        console.log(`🔍 isGoblinProp called for ${outcome.marketLabel}:`);
+        console.log(`   isPPGoblin: ${isPPGoblin}, isGoblinOdds: ${isGoblinOdds}`);
+        console.log(`   PP odds: "${outcome?.bookOdds?.PRIZEPICKS?.odds}" | parsed: ${ppOdds}`);
+        console.log(`   odds_type: "${outcome?.bookOdds?.PRIZEPICKS?.identifier?.bookProps?.odds_type}"`);
+    }
+    
+    return result;
 }
 
 // ---------- Map props ----------
+let mapPropsDebugCount = 0;
 function mapProps(item, filterType) {
     const { outcome, stats: raw } = item;
     const stats = getBlendedStats(raw);
@@ -604,7 +627,26 @@ function mapProps(item, filterType) {
     const opponentDefenseRank = getOpponentDefenseRanking(outcome.teamId, outcome.eventId, outcome.proposition);
     const isOver = outcome.outcomeLabel === "Over";
     const defenseClass = defenseClassForRank(opponentDefenseRank, isOver, leagueType);
-    if (opponentDefenseRank == "N/A" && opponentTeamName === "Unknown Team") return null;
+    
+    // Debug mode: allow props even if we can't find opponent team/defense rank
+    const ALLOW_MISSING_OPPONENT = DEBUG_MODE;
+    
+    if (!ALLOW_MISSING_OPPONENT && opponentDefenseRank == "N/A" && opponentTeamName === "Unknown Team") {
+      if (DEBUG_MODE && mapPropsDebugCount < 3) {
+        mapPropsDebugCount++;
+        console.log(`❌ mapProps returned null: ${outcome.marketLabel}`);
+        console.log(`   opponentTeamId: ${opponentTeamId}, opponentTeamName: ${opponentTeamName}`);
+        console.log(`   opponentDefenseRank: ${opponentDefenseRank}`);
+        console.log(`   entities loaded: ${entities?.content?.teams?.length || 0} teams`);
+        console.log(`   schedule loaded: ${schedule?.events?.length || 0} events`);
+      }
+      return null;
+    }
+    
+    // Use "vs TBD" if we can't find opponent in debug mode
+    if (ALLOW_MISSING_OPPONENT && opponentTeamName === "Unknown Team") {
+      opponentTeamName = "TBD";
+    }
   
     const l20Color = trendClass(stats.l20), l10Color=trendClass(stats.l10), l5Color=trendClass(stats.l5),
           h2hColor=trendClass(stats.h2h), curSeasonColor=trendClass(stats.curSeason), prevSeasonColor=trendClass(raw?.prevSeason),
@@ -652,7 +694,12 @@ function mapProps(item, filterType) {
   
       // hidden helpers for mixing/diversity
       _teamId: outcome.teamId,
-      _isOver: isOver ? 1 : 0
+      _isOver: isOver ? 1 : 0,
+      _isGoblin: isGoblin,  // Store goblin status for slip building
+      
+      // Keep a reference to stats and outcome for slip building
+      stats: raw,
+      outcome: outcome  // Keep full outcome for slip building logic
     } : null;
   }
   
@@ -674,10 +721,41 @@ function mapProps(item, filterType) {
   }
   
   // ---------- Filters ----------
+  // Debug counters (only active when running locally)
+  const DEBUG_MODE = typeof global !== 'undefined' && global.DEBUG_FILTER;
+  let debugCounters = {
+    total: 0,
+    noPrizePicks: 0,
+    wrongOverUnder: 0,
+    failedSafety: 0,
+    passed: 0,
+    goblinsFound: 0
+  };
+
   function filterProps(item, filterType) {
+    if (DEBUG_MODE) {
+      debugCounters.total++;
+      // Check for goblins early in filtering
+      const ppOddsRaw = item.outcome.bookOdds.PRIZEPICKS?.odds;
+      const ppOdds = parseFloat(ppOddsRaw);
+      const isGoblinTest = isGoblinProp(item.outcome);
+      if (isGoblinTest && debugCounters.total <= 3) {
+        console.log(`\n👿 Goblin detected in filterProps: ${item.outcome.marketLabel}`);
+        console.log(`   PP Odds raw: "${ppOddsRaw}" | parsed: ${ppOdds} | isGoblinProp: ${isGoblinTest}`);
+      }
+    }
+    
     const isPrizePicks = item.outcome.bookOdds.PRIZEPICKS !== undefined;
     const isSleeper    = item.outcome.bookOdds.SLEEPER   !== undefined;
-    if (showPrizePicksOnly && !isPrizePicks) return false;
+    if (showPrizePicksOnly && !isPrizePicks) {
+      if (DEBUG_MODE) {
+        debugCounters.noPrizePicks++;
+        if (debugCounters.noPrizePicks === 1) {
+          console.log(`❌ Filter reason: No PrizePicks odds for ${item.outcome.marketLabel}`);
+        }
+      }
+      return false;
+    }
 
     const outcomeLabel = item.outcome.outcomeLabel;
     const periodLabel  = item.outcome.periodLabel;
@@ -686,24 +764,79 @@ function mapProps(item, filterType) {
   
     const overFilters  = new Set([FilterType.FILTER_HIGH_ODDS_HIGH_TREND_OVERS]);
     const underFilters = new Set([FilterType.FILTER_HIGH_ODDS_HIGH_TREND_UNDERS]);
-    if (overFilters.has(filterType) && isUnder) return false;
-    if (underFilters.has(filterType) && isOver)  return false;
+    if (overFilters.has(filterType) && isUnder) {
+      if (DEBUG_MODE) debugCounters.wrongOverUnder++;
+      return false;
+    }
+    if (underFilters.has(filterType) && isOver) {
+      if (DEBUG_MODE) debugCounters.wrongOverUnder++;
+      return false;
+    }
   
     const blended = getBlendedStats(item.stats || {});
     const ppOdds        = parseFloat(item.outcome.bookOdds.PRIZEPICKS?.odds);
-    const noGoblinProps = ppOdds !== -137;
+    const isGoblin      = isGoblinProp(item.outcome);  // Use the proper goblin detection function
+    const noGoblinProps = !isGoblin;  // Inverse of isGoblin
     const avgOdds       = getAvgOdds(item);
-    const isGoblin      = avgOdds <= -300;
   
     const safeRegular          = noGoblinProps && isSafeRegular(blended);
     const safeRegularPlayoffs  = noGoblinProps && isSafeRegularPlayoffs(item);
     const safeGoblin           = isGoblin && isSafeGoblin(blended, avgOdds);
     const safe2ndHalf          = noGoblinProps && isSafe2ndHalf(blended, periodLabel);
+    
+    // Debug goblin safety checks
+    if (DEBUG_MODE && isGoblin) {
+      debugCounters.goblinsFound++;
+      if (debugCounters.goblinsFound <= 5) {
+        console.log(`\n🧟 Goblin #${debugCounters.goblinsFound}: ${item.outcome.marketLabel}`);
+        console.log(`   safeGoblin: ${safeGoblin}`);
+        console.log(`   L20:${blended.l20?.toFixed(2)} L10:${blended.l10?.toFixed(2)} L5:${blended.l5?.toFixed(2)} H2H:${blended.h2h?.toFixed(2)} Season:${blended.curSeason?.toFixed(2)}`);
+      }
+    }
   
-    if (showOnlyGoblins)      return safeGoblin;
-    if (showOnly2ndHalf)      return (safeGoblin || safe2ndHalf);
-    if (isPlayoffs)           return (isSafeGoblinPlayoffs && isGoblin) || safeRegularPlayoffs;
-    return (safeGoblin || safeRegular);
+    let passed = false;
+    if (showOnlyGoblins)      passed = safeGoblin;
+    else if (showOnly2ndHalf) passed = (safeGoblin || safe2ndHalf);
+    else if (isPlayoffs)      passed = (isSafeGoblinPlayoffs && isGoblin) || safeRegularPlayoffs;
+    else                      passed = (safeGoblin || safeRegular);
+    
+    // Debug when safe goblins aren't passing
+    if (DEBUG_MODE && isGoblin && safeGoblin && !passed) {
+      console.log(`⚠️  Safe goblin NOT passing filter: ${item.outcome.marketLabel}`);
+      console.log(`   showOnlyGoblins: ${showOnlyGoblins}, showOnly2ndHalf: ${showOnly2ndHalf}, isPlayoffs: ${isPlayoffs}`);
+      console.log(`   safeGoblin: ${safeGoblin}, safeRegular: ${safeRegular}`);
+    }
+    
+    if (DEBUG_MODE) {
+      if (passed) {
+        debugCounters.passed++;
+        // Show first 3 regular passes, but ALWAYS show goblin passes
+        if (debugCounters.passed <= 3 || (isGoblin && debugCounters.passed <= 10)) {
+          console.log(`✅ Passed: ${item.outcome.marketLabel} | isGoblin:${isGoblin} | safeRegular:${safeRegular} | safeGoblin:${safeGoblin}`);
+          console.log(`   Stats: L5:${blended.l5?.toFixed(2)} L10:${blended.l10?.toFixed(2)} H2H:${blended.h2h?.toFixed(2)} Season:${blended.curSeason?.toFixed(2)}`);
+        }
+      } else {
+        debugCounters.failedSafety++;
+        if (debugCounters.failedSafety <= 3) {
+          console.log(`❌ Failed safety: ${item.outcome.marketLabel} | isGoblin:${isGoblin} | safeRegular:${safeRegular} | safeGoblin:${safeGoblin}`);
+          console.log(`   Stats: L5:${blended.l5?.toFixed(2)} L10:${blended.l10?.toFixed(2)} H2H:${blended.h2h?.toFixed(2)} Season:${blended.curSeason?.toFixed(2)}`);
+        }
+      }
+    }
+    
+    return passed;
+  }
+  
+  // Print debug summary at the end
+  if (DEBUG_MODE && typeof global !== 'undefined') {
+    global.printFilterDebug = () => {
+      console.log('\n📊 Filter Debug Summary:');
+      console.log(`   Total props processed: ${debugCounters.total}`);
+      console.log(`   ❌ Filtered (no PrizePicks): ${debugCounters.noPrizePicks}`);
+      console.log(`   ❌ Filtered (wrong Over/Under): ${debugCounters.wrongOverUnder}`);
+      console.log(`   ❌ Filtered (failed safety checks): ${debugCounters.failedSafety}`);
+      console.log(`   ✅ Passed all filters: ${debugCounters.passed}`);
+    };
   }
   
   // ---------- Slip builders ----------
@@ -760,7 +893,7 @@ function mapProps(item, filterType) {
   
   function buildAllRegularPairs(rows) {
     const regularsPos = rows.filter(r => 
-        !isGoblinProp(r.outcome) && typeof r.edgeGapPct === "number" && r.edgeGapPct > 0
+        !r._isGoblin && typeof r.edgeGapPct === "number" && r.edgeGapPct > 0
     );
   
     // Unique by player first
@@ -864,7 +997,6 @@ function mapProps(item, filterType) {
   }
   
   // Build one mega slip (prefer 6; fallback to 5→4→3) using weighted scoring system,
-  // mixing Goblins and Regulars and enforcing unique players.
   function buildMegaSlip(rows) {
     // Calculate weighted score for each prop based on multiple factors
     function calculateScore(prop) {
@@ -1079,14 +1211,29 @@ function buildRecommendedSlips(rows) {
   
     // Get all safe goblins with positive edge gaps, sorted by gap value
     const safeGoblins = rows.filter(r => {
-        // First check if it's a goblin prop
-        if (!isGoblinProp(r.outcome)) return false;
+        // First check if it's a goblin prop (using the stored flag)
+        const isGoblin = r._isGoblin;
+        if (DEBUG_MODE && isGoblin) {
+            console.log(`\n🔍 Goblin found in buildRecommendedSlips: ${r.player}`);
+            console.log(`   Edge gap: ${r.edgeGapPct}`);
+            console.log(`   Stats: L20:${r.l20} L10:${r.l10} L5:${r.l5} curSeason:${r.curSeason} H2H:${r.h2h}`);
+            const stats = getBlendedStats(r.stats || {});
+            console.log(`   isSafeGoblin: ${isSafeGoblin(stats)}`);
+        }
+        
+        if (!isGoblin) return false;
         // Then check if it has a valid positive edge gap
         if (r.edgeGapPct <= 0) return false;
         // Finally check if it passes safety criteria
         const stats = getBlendedStats(r.stats || {});
         return isPlayoffs ? isSafeGoblinPlayoffs(r) : isSafeGoblin(stats);
     }).sort((a, b) => b.edgeGapPct - a.edgeGapPct);
+    
+    if (DEBUG_MODE) {
+        console.log(`\n🎰 Goblin Slip Debug:`);
+        console.log(`   Total rows passed to buildRecommendedSlips: ${rows.length}`);
+        console.log(`   Safe goblins found: ${safeGoblins.length}`);
+    }
 
     // If we have any safe goblins, create a single slip with all of them
     if (safeGoblins.length > 0) {
@@ -1116,7 +1263,7 @@ function buildRecommendedSlips(rows) {
     const top2Goblins = topByGap(safeGoblins, 2);
     // Get regulars (non-goblins) with positive edge gaps
     const regulars = rows.filter(r => 
-        !isGoblinProp(r.outcome) && typeof r.edgeGapPct === "number" && r.edgeGapPct > 0
+        !r._isGoblin && typeof r.edgeGapPct === "number" && r.edgeGapPct > 0
     );
     const reg1 = topByGap(regulars, 1);
     if (top2Goblins.length === 2 && reg1.length === 1) {

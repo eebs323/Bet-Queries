@@ -2,113 +2,63 @@
     "events": [
         {
             "leagueId": "NBA",
-            "eventId": "f276be181f0d6a1aadbc19747b771a3f12be01f3",
-            "scheduledTime": "2025-02-12T03:00:00+00:00",
+            "eventId": "1a23093216fa0c87ebb5e9edc1f58edc72b320fa",
+            "scheduledTime": "2025-11-01T22:00:00+00:00",
             "live": false,
             "status": "pregame",
-            "venue": "Footprint Center",
-            "network": "TNT/truTV/MAX",
-            "season": 2024,
+            "venue": "Spectrum Center",
+            "network": "FDSNX/FDSSE",
+            "season": 2025,
             "code": "REG",
             "home": {
-                "teamId": "64a9639ddc116893584736c716944ed20b9f588d",
-                "name": "Suns",
-                "alias": "PHX",
-                "market": "Phoenix"
+                "teamId": "5ba6dc6435ee643d67ce8e8607e9182812ceb766",
+                "name": "Hornets",
+                "alias": "CHA",
+                "market": "Charlotte"
             },
             "away": {
-                "teamId": "8b8991f626a4178b6cc48aa9a5da8881a8807999",
-                "name": "Grizzlies",
-                "alias": "MEM",
-                "market": "Memphis"
+                "teamId": "8c88a0867c945d6563fbbadf69602c09d183ff2e",
+                "name": "Timberwolves",
+                "alias": "MIN",
+                "market": "Minnesota"
             },
-            "dayOfWeek": 1,
-            "timezone": "US/Arizona"
-        },
-        {
-            "leagueId": "NBA",
-            "eventId": "8a3acbe876ae47a6fb062b6b6242676de0f41962",
-            "scheduledTime": "2025-02-12T00:30:00+00:00",
-            "live": false,
-            "status": "pregame",
-            "venue": "Gainbridge Fieldhouse",
-            "network": "TNT/MSG/truTV/MAX",
-            "season": 2024,
-            "code": "REG",
-            "home": {
-                "teamId": "2748781441a54cb858c43de2e1d3008c633b7811",
-                "name": "Pacers",
-                "alias": "IND",
-                "market": "Indiana"
-            },
-            "away": {
-                "teamId": "d4830db7b74148699bbbadb73e577b3ca942bd3d",
-                "name": "Knicks",
-                "alias": "NYK",
-                "market": "New York"
-            },
-            "dayOfWeek": 1,
+            "dayOfWeek": 5,
             "timezone": "US/Eastern"
         },
         {
             "leagueId": "NBA",
-            "eventId": "220834a477ff3c089174a6498cf91a4171a7b8b2",
-            "scheduledTime": "2025-03-08T03:00:00+00:00",
+            "eventId": "99b12c9a1ef59631fea8fb23afa2ce8a95fc6e47",
+            "scheduledTime": "2025-11-04T01:00:00+00:00",
             "live": false,
             "status": "pregame",
-            "venue": "Golden 1 Center",
-            "network": "NBCS-CA/KENS",
-            "season": 2024,
+            "venue": "Toyota Center",
+            "network": "SCHN/KFAA",
+            "season": 2025,
             "code": "REG",
             "home": {
-                "teamId": "6092f749157f79f903cad855769b66912c04b078",
-                "name": "Kings",
-                "alias": "SAC",
-                "market": "Sacramento"
+                "teamId": "d5f3ad1e9ca08a5aab3cd58686138be4181e1577",
+                "name": "Rockets",
+                "alias": "HOU",
+                "market": "Houston"
             },
             "away": {
-                "teamId": "ce7339707a081631ad27504e39b4863d66ed7b00",
-                "name": "Spurs",
-                "alias": "SAS",
-                "market": "San Antonio"
+                "teamId": "4f53719cd0222b154b2c0e8cfba04afca9ef2aff",
+                "name": "Mavericks",
+                "alias": "DAL",
+                "market": "Dallas"
             },
-            "dayOfWeek": 4,
-            "timezone": "US/Pacific"
+            "dayOfWeek": 0,
+            "timezone": "US/Central"
         },
         {
             "leagueId": "NBA",
-            "eventId": "e2b34d2e644c566fe6a3bae639947ef3a64ca6ef",
-            "scheduledTime": "2025-03-25T23:30:00+00:00",
-            "live": false,
-            "status": "pregame",
-            "venue": "Kaseya Center",
-            "network": "NBCS-BA/FDSSUN",
-            "season": 2024,
-            "code": "REG",
-            "home": {
-                "teamId": "358de170a5371e3454a3555829b270a5f3e6710a",
-                "name": "Heat",
-                "alias": "MIA",
-                "market": "Miami"
-            },
-            "away": {
-                "teamId": "b50b6328655b9c63ff48e9dfa7e9e5fb32e31c9a",
-                "name": "Warriors",
-                "alias": "GSW",
-                "market": "Golden State"
-            },
-            "dayOfWeek": 1,
-            "timezone": "US/Eastern"
-        },
-        {
-            "leagueId": "NBA",
-            "eventId": "c852111403da8f114fd51639b7d554301ba37a07",
-            "scheduledTime": "2025-02-12T00:00:00+00:00",
-            "live": false,
-            "status": "pregame",
-            "venue": "Wells Fargo Center",
-            "network": "NBCS-PH/TSN",
-            "season": 2024,
+            "eventId": "e9057c21b820fac4264755976921ed530ab5bd75",
+            "scheduledTime": "2025-10-31T23:00:00+00:00",
+            "live": true,
+            "status": "live",
+            "venue": "Xfinity Mobile Arena",
+            "network": "Amazon Prime Video",
+            "season": 2025,
             "code": "REG",
             "home": {
                 "teamId": "5a97ad62cb6aa70cb471cda6a5bc728b760128b3",
@@ -117,23 +67,249 @@
                 "market": "Philadelphia"
             },
             "away": {
-                "teamId": "d9c2ca26b7570dcd8895a3cce018787a4e3c46de",
-                "name": "Raptors",
-                "alias": "TOR",
-                "market": "Toronto"
+                "teamId": "98a2d5e40d2195cf3d24bdf8b452d6c92d1a01d0",
+                "name": "Celtics",
+                "alias": "BOS",
+                "market": "Boston"
             },
-            "dayOfWeek": 1,
+            "dayOfWeek": 4,
             "timezone": "US/Eastern"
         },
         {
             "leagueId": "NBA",
-            "eventId": "cfe94edaeadb747d6a5df0f4cbf36fca571c2a84",
-            "scheduledTime": "2025-02-26T03:00:00+00:00",
+            "eventId": "aed842fb36068ac463f7bc44f8a78df50d699563",
+            "scheduledTime": "2025-11-02T00:00:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "TD Garden",
+            "network": "NBCS-BOS/SCHN",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "98a2d5e40d2195cf3d24bdf8b452d6c92d1a01d0",
+                "name": "Celtics",
+                "alias": "BOS",
+                "market": "Boston"
+            },
+            "away": {
+                "teamId": "d5f3ad1e9ca08a5aab3cd58686138be4181e1577",
+                "name": "Rockets",
+                "alias": "HOU",
+                "market": "Houston"
+            },
+            "dayOfWeek": 5,
+            "timezone": "US/Eastern"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "14a57d77306f1b2e0e7223370e5ad0a5cee3febf",
+            "scheduledTime": "2025-11-01T02:00:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Mortgage Matchup Center",
+            "network": "KJZZ/Jazz+/AZFamily/Suns+",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "64a9639ddc116893584736c716944ed20b9f588d",
+                "name": "Suns",
+                "alias": "PHX",
+                "market": "Phoenix"
+            },
+            "away": {
+                "teamId": "caa89c26e33d09acbb2fdf2eae3f5a2d4538da8e",
+                "name": "Jazz",
+                "alias": "UTA",
+                "market": "Utah"
+            },
+            "dayOfWeek": 4,
+            "timezone": "US/Arizona"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "2b23e245f0c72c18f9d332d2fc41e34f2efd299d",
+            "scheduledTime": "2025-11-01T02:00:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Moda Center",
+            "network": "KUNP/ALT/KTVD",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "94c72bbe4757aea9120d7a9d5e761cf53534d916",
+                "name": "Trail Blazers",
+                "alias": "POR",
+                "market": "Portland"
+            },
+            "away": {
+                "teamId": "ca6a4f58f8c0e2e620fbe3043feb34a968dc178e",
+                "name": "Nuggets",
+                "alias": "DEN",
+                "market": "Denver"
+            },
+            "dayOfWeek": 4,
+            "timezone": "US/Pacific"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "1faa136ad478532d35d57de4e37c334e4dc00739",
+            "scheduledTime": "2025-11-05T03:00:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Chase Center",
+            "network": "NBCS-BA/AZFamily/Suns+",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "b50b6328655b9c63ff48e9dfa7e9e5fb32e31c9a",
+                "name": "Warriors",
+                "alias": "GSW",
+                "market": "Golden State"
+            },
+            "away": {
+                "teamId": "64a9639ddc116893584736c716944ed20b9f588d",
+                "name": "Suns",
+                "alias": "PHX",
+                "market": "Phoenix"
+            },
+            "dayOfWeek": 1,
+            "timezone": "US/Pacific"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "4495405f9855cae68317b106c8890c23e3d1d8ca",
+            "scheduledTime": "2025-11-06T02:00:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Ball Arena",
+            "network": "FDSSUN/ALT/KTVD/KUSA",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "ca6a4f58f8c0e2e620fbe3043feb34a968dc178e",
+                "name": "Nuggets",
+                "alias": "DEN",
+                "market": "Denver"
+            },
+            "away": {
+                "teamId": "358de170a5371e3454a3555829b270a5f3e6710a",
+                "name": "Heat",
+                "alias": "MIA",
+                "market": "Miami"
+            },
+            "dayOfWeek": 2,
+            "timezone": "US/Mountain"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "578ef82eb621ee4d1c62771940ba615e5c2090ed",
+            "scheduledTime": "2025-11-04T03:30:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Intuit Dome",
+            "network": "FDSSUN/FDSSC",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "e4c5f21b07ab9862386ae653e7e993c499e152c9",
+                "name": "Clippers",
+                "alias": "LAC",
+                "market": "LA"
+            },
+            "away": {
+                "teamId": "358de170a5371e3454a3555829b270a5f3e6710a",
+                "name": "Heat",
+                "alias": "MIA",
+                "market": "Miami"
+            },
+            "dayOfWeek": 0,
+            "timezone": "US/Pacific"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "f95be671d96296cab9d3eeec4bf13d2604a320f0",
+            "scheduledTime": "2025-11-02T02:00:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Mexico City Arena",
+            "network": "Peacock",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "a0fc76a303c6b4d1000cdbf92ad46b7646181248",
+                "name": "Pistons",
+                "alias": "DET",
+                "market": "Detroit"
+            },
+            "away": {
+                "teamId": "4f53719cd0222b154b2c0e8cfba04afca9ef2aff",
+                "name": "Mavericks",
+                "alias": "DAL",
+                "market": "Dallas"
+            },
+            "neutralSite": true,
+            "dayOfWeek": 5,
+            "timezone": "America/Mexico_City"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "a04d53a7dae06f8aaa36636cff2934a989d8b88c",
+            "scheduledTime": "2025-11-01T02:30:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Intuit Dome",
+            "network": "Gulf Coast Sports/Pelicans+/FDSSC",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "e4c5f21b07ab9862386ae653e7e993c499e152c9",
+                "name": "Clippers",
+                "alias": "LAC",
+                "market": "LA"
+            },
+            "away": {
+                "teamId": "4907a12e8b1f6e5955013df5a468d4a934a18831",
+                "name": "Pelicans",
+                "alias": "NOP",
+                "market": "New Orleans"
+            },
+            "dayOfWeek": 4,
+            "timezone": "US/Pacific"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "7e28dfbc2443c74c37dbc7d3821eac8842293bbc",
+            "scheduledTime": "2026-01-19T19:30:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Rocket Arena",
+            "network": "NBC/Peacock",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "c34ab8c13790a5ba1f3621df877294e0dfeedfa2",
+                "name": "Cavaliers",
+                "alias": "CLE",
+                "market": "Cleveland"
+            },
+            "away": {
+                "teamId": "a61f9df311814fb4446ddc13ca7b8d00fa67743c",
+                "name": "Thunder",
+                "alias": "OKC",
+                "market": "Oklahoma City"
+            },
+            "dayOfWeek": 0,
+            "timezone": "US/Eastern"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "13af7d69740dc10d087ceb61e7da8855a4913438",
+            "scheduledTime": "2025-12-26T01:00:00+00:00",
             "live": false,
             "status": "pregame",
             "venue": "Crypto.com Arena",
-            "network": "TNT/SportsNet LA/truTV/MAX",
-            "season": 2024,
+            "network": "ABC/ESPN",
+            "season": 2025,
             "code": "REG",
             "home": {
                 "teamId": "33058411c48f4f3e3aa2b9cb27a261f467daafbb",
@@ -142,23 +318,423 @@
                 "market": "Los Angeles"
             },
             "away": {
+                "teamId": "d5f3ad1e9ca08a5aab3cd58686138be4181e1577",
+                "name": "Rockets",
+                "alias": "HOU",
+                "market": "Houston"
+            },
+            "dayOfWeek": 3,
+            "timezone": "US/Pacific"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "a01c87b73efcf40b988cdd37f5f8a7bb19719d78",
+            "scheduledTime": "2025-12-25T22:00:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Chase Center",
+            "network": "ABC/ESPN",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "b50b6328655b9c63ff48e9dfa7e9e5fb32e31c9a",
+                "name": "Warriors",
+                "alias": "GSW",
+                "market": "Golden State"
+            },
+            "away": {
                 "teamId": "4f53719cd0222b154b2c0e8cfba04afca9ef2aff",
                 "name": "Mavericks",
                 "alias": "DAL",
                 "market": "Dallas"
             },
-            "dayOfWeek": 1,
+            "dayOfWeek": 3,
             "timezone": "US/Pacific"
         },
         {
             "leagueId": "NBA",
-            "eventId": "05b5c02a3516298a9b9fa4beade86328a25fff2f",
-            "scheduledTime": "2025-02-12T01:00:00+00:00",
+            "eventId": "6a3a51a1f1709c869a220f8f3866c44c6c822cc0",
+            "scheduledTime": "2025-12-25T19:30:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Paycom Center",
+            "network": "ABC/ESPN",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "a61f9df311814fb4446ddc13ca7b8d00fa67743c",
+                "name": "Thunder",
+                "alias": "OKC",
+                "market": "Oklahoma City"
+            },
+            "away": {
+                "teamId": "ce7339707a081631ad27504e39b4863d66ed7b00",
+                "name": "Spurs",
+                "alias": "SAS",
+                "market": "San Antonio"
+            },
+            "dayOfWeek": 3,
+            "timezone": "US/Central"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "8315676b721eaa8a2d43bd46b3e091babbf5794a",
+            "scheduledTime": "2025-11-06T03:00:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Crypto.com Arena",
+            "network": "ESPN/SportsNet LA/FDSSW",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "33058411c48f4f3e3aa2b9cb27a261f467daafbb",
+                "name": "Lakers",
+                "alias": "LAL",
+                "market": "Los Angeles"
+            },
+            "away": {
+                "teamId": "ce7339707a081631ad27504e39b4863d66ed7b00",
+                "name": "Spurs",
+                "alias": "SAS",
+                "market": "San Antonio"
+            },
+            "dayOfWeek": 2,
+            "timezone": "US/Pacific"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "d48080ebb98caba736143196b64aeacd19aaeb1e",
+            "scheduledTime": "2025-10-31T23:30:00+00:00",
+            "live": true,
+            "status": "live",
+            "venue": "Rocket Arena",
+            "network": "FDSOH/TSN",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "c34ab8c13790a5ba1f3621df877294e0dfeedfa2",
+                "name": "Cavaliers",
+                "alias": "CLE",
+                "market": "Cleveland"
+            },
+            "away": {
+                "teamId": "d9c2ca26b7570dcd8895a3cce018787a4e3c46de",
+                "name": "Raptors",
+                "alias": "TOR",
+                "market": "Toronto"
+            },
+            "dayOfWeek": 4,
+            "timezone": "US/Eastern"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "b1cab815a8d0d9f5de3ac1a9f2861256d3e83554",
+            "scheduledTime": "2025-11-06T01:30:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "American Airlines Center",
+            "network": "KFAA/WFAA/Gulf Coast Sports/Pelicans+",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "4f53719cd0222b154b2c0e8cfba04afca9ef2aff",
+                "name": "Mavericks",
+                "alias": "DAL",
+                "market": "Dallas"
+            },
+            "away": {
+                "teamId": "4907a12e8b1f6e5955013df5a468d4a934a18831",
+                "name": "Pelicans",
+                "alias": "NOP",
+                "market": "New Orleans"
+            },
+            "dayOfWeek": 2,
+            "timezone": "US/Central"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "ffea7017d0435f0d4dadd74adf3326fb3db5ed77",
+            "scheduledTime": "2025-11-03T02:30:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Crypto.com Arena",
+            "network": "FDSSUN/SportsNet LA",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "33058411c48f4f3e3aa2b9cb27a261f467daafbb",
+                "name": "Lakers",
+                "alias": "LAL",
+                "market": "Los Angeles"
+            },
+            "away": {
+                "teamId": "358de170a5371e3454a3555829b270a5f3e6710a",
+                "name": "Heat",
+                "alias": "MIA",
+                "market": "Miami"
+            },
+            "dayOfWeek": 6,
+            "timezone": "US/Pacific"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "4b683f45cce4720f95a6da18dd61e3e1005cad3b",
+            "scheduledTime": "2025-11-02T20:30:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Paycom Center",
+            "network": "Gulf Coast Sports/Pelicans+/FDSOK",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "a61f9df311814fb4446ddc13ca7b8d00fa67743c",
+                "name": "Thunder",
+                "alias": "OKC",
+                "market": "Oklahoma City"
+            },
+            "away": {
+                "teamId": "4907a12e8b1f6e5955013df5a468d4a934a18831",
+                "name": "Pelicans",
+                "alias": "NOP",
+                "market": "New Orleans"
+            },
+            "dayOfWeek": 6,
+            "timezone": "US/Central"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "400a0052e5801a19a518e598aab9960eef4fe2de",
+            "scheduledTime": "2026-01-20T01:00:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Little Caesars Arena",
+            "network": "NBC/Peacock",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "a0fc76a303c6b4d1000cdbf92ad46b7646181248",
+                "name": "Pistons",
+                "alias": "DET",
+                "market": "Detroit"
+            },
+            "away": {
+                "teamId": "98a2d5e40d2195cf3d24bdf8b452d6c92d1a01d0",
+                "name": "Celtics",
+                "alias": "BOS",
+                "market": "Boston"
+            },
+            "dayOfWeek": 0,
+            "timezone": "US/Eastern"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "7ce4c857ace3abf2c661cc2817ef5cc4e4ab7276",
+            "scheduledTime": "2025-11-06T01:00:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "FedExForum",
+            "network": "SCHN/FDSSE",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "8b8991f626a4178b6cc48aa9a5da8881a8807999",
+                "name": "Grizzlies",
+                "alias": "MEM",
+                "market": "Memphis"
+            },
+            "away": {
+                "teamId": "d5f3ad1e9ca08a5aab3cd58686138be4181e1577",
+                "name": "Rockets",
+                "alias": "HOU",
+                "market": "Houston"
+            },
+            "dayOfWeek": 2,
+            "timezone": "US/Central"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "0fee883e61006c9e56dc451b00c79a25c4165d7e",
+            "scheduledTime": "2025-11-04T00:30:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "TD Garden",
+            "network": "NBCS-BOS/Jazz+/KJZZ",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "98a2d5e40d2195cf3d24bdf8b452d6c92d1a01d0",
+                "name": "Celtics",
+                "alias": "BOS",
+                "market": "Boston"
+            },
+            "away": {
+                "teamId": "caa89c26e33d09acbb2fdf2eae3f5a2d4538da8e",
+                "name": "Jazz",
+                "alias": "UTA",
+                "market": "Utah"
+            },
+            "dayOfWeek": 0,
+            "timezone": "US/Eastern"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "d347686c2604cc84dc57b0166c3a25f80fad7f45",
+            "scheduledTime": "2025-10-31T23:00:00+00:00",
+            "live": true,
+            "status": "live",
+            "venue": "Gainbridge Fieldhouse",
+            "network": "FDSSE/FDSIN",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "2748781441a54cb858c43de2e1d3008c633b7811",
+                "name": "Pacers",
+                "alias": "IND",
+                "market": "Indiana"
+            },
+            "away": {
+                "teamId": "50e38c06612b7be8a786db15f2320f52a51fdf2b",
+                "name": "Hawks",
+                "alias": "ATL",
+                "market": "Atlanta"
+            },
+            "dayOfWeek": 4,
+            "timezone": "US/Eastern"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "b94108a13544d1cc9c617a2067b86d70191f4b55",
+            "scheduledTime": "2025-11-01T01:30:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "FedExForum",
+            "network": "Amazon Prime Video/SportsNet LA",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "8b8991f626a4178b6cc48aa9a5da8881a8807999",
+                "name": "Grizzlies",
+                "alias": "MEM",
+                "market": "Memphis"
+            },
+            "away": {
+                "teamId": "33058411c48f4f3e3aa2b9cb27a261f467daafbb",
+                "name": "Lakers",
+                "alias": "LAL",
+                "market": "Los Angeles"
+            },
+            "dayOfWeek": 4,
+            "timezone": "US/Central"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "462b2c96aba80eeeee815a6e11673d2402f53419",
+            "scheduledTime": "2025-11-04T02:00:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Ball Arena",
+            "network": "ALT/NBCS-CA",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "ca6a4f58f8c0e2e620fbe3043feb34a968dc178e",
+                "name": "Nuggets",
+                "alias": "DEN",
+                "market": "Denver"
+            },
+            "away": {
+                "teamId": "6092f749157f79f903cad855769b66912c04b078",
+                "name": "Kings",
+                "alias": "SAC",
+                "market": "Sacramento"
+            },
+            "dayOfWeek": 0,
+            "timezone": "US/Mountain"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "da5da5debd2ebb6282a5c6d3989ebb51a9a556f8",
+            "scheduledTime": "2025-11-01T23:00:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Capital One Arena",
+            "network": "FDSFL/MNMT",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "e80e082eaa06746ecdd8b11ef2348837bb30a3ba",
+                "name": "Wizards",
+                "alias": "WAS",
+                "market": "Washington"
+            },
+            "away": {
+                "teamId": "dc5e01c404e9f5e242a21e65aae085811f3230be",
+                "name": "Magic",
+                "alias": "ORL",
+                "market": "Orlando"
+            },
+            "dayOfWeek": 5,
+            "timezone": "US/Eastern"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "4d31c3a1d4c2cf7d1a5b80b0b7d1c63a4fef93a2",
+            "scheduledTime": "2025-11-06T03:00:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Moda Center",
+            "network": "KUNP/FDSOK",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "94c72bbe4757aea9120d7a9d5e761cf53534d916",
+                "name": "Trail Blazers",
+                "alias": "POR",
+                "market": "Portland"
+            },
+            "away": {
+                "teamId": "a61f9df311814fb4446ddc13ca7b8d00fa67743c",
+                "name": "Thunder",
+                "alias": "OKC",
+                "market": "Oklahoma City"
+            },
+            "dayOfWeek": 2,
+            "timezone": "US/Pacific"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "46aa68b12438efc82a5b52ea0445a8f6c5080ab0",
+            "scheduledTime": "2025-11-01T23:00:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Gainbridge Fieldhouse",
+            "network": "FDSIN/NBCS-BA/NBA TV",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "2748781441a54cb858c43de2e1d3008c633b7811",
+                "name": "Pacers",
+                "alias": "IND",
+                "market": "Indiana"
+            },
+            "away": {
+                "teamId": "b50b6328655b9c63ff48e9dfa7e9e5fb32e31c9a",
+                "name": "Warriors",
+                "alias": "GSW",
+                "market": "Golden State"
+            },
+            "dayOfWeek": 5,
+            "timezone": "US/Eastern"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "e5603a8f6d67fcbba01fc1bbbc087134bef319c4",
+            "scheduledTime": "2025-11-05T01:00:00+00:00",
             "live": false,
             "status": "pregame",
             "venue": "United Center",
-            "network": "CHSN/FDSDET",
-            "season": 2024,
+            "network": "CHSN/NBCS-PH+",
+            "season": 2025,
             "code": "REG",
             "home": {
                 "teamId": "94df91d4a18186b5497c674a59bd3053f3bfa662",
@@ -167,13 +743,438 @@
                 "market": "Chicago"
             },
             "away": {
+                "teamId": "5a97ad62cb6aa70cb471cda6a5bc728b760128b3",
+                "name": "76ers",
+                "alias": "PHI",
+                "market": "Philadelphia"
+            },
+            "dayOfWeek": 1,
+            "timezone": "US/Central"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "0dda11db18f9495cf985fd7f5a2119e5f2788d17",
+            "scheduledTime": "2025-11-04T01:00:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "FedExForum",
+            "network": "FDSDET/FDSSE",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "8b8991f626a4178b6cc48aa9a5da8881a8807999",
+                "name": "Grizzlies",
+                "alias": "MEM",
+                "market": "Memphis"
+            },
+            "away": {
                 "teamId": "a0fc76a303c6b4d1000cdbf92ad46b7646181248",
                 "name": "Pistons",
                 "alias": "DET",
                 "market": "Detroit"
             },
-            "dayOfWeek": 1,
+            "dayOfWeek": 0,
             "timezone": "US/Central"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "a225ed1adb48bc17ab9b9b4122c4bca16bf75a00",
+            "scheduledTime": "2025-12-25T17:00:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Madison Square Garden",
+            "network": "ABC/ESPN",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "d4830db7b74148699bbbadb73e577b3ca942bd3d",
+                "name": "Knicks",
+                "alias": "NYK",
+                "market": "New York"
+            },
+            "away": {
+                "teamId": "c34ab8c13790a5ba1f3621df877294e0dfeedfa2",
+                "name": "Cavaliers",
+                "alias": "CLE",
+                "market": "Cleveland"
+            },
+            "dayOfWeek": 3,
+            "timezone": "US/Eastern"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "aa5a1b04cc3bb60649d4f916c00c7dfcbe45da24",
+            "scheduledTime": "2025-11-04T00:00:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Barclays Center",
+            "network": "Peacock/FDSN",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "057435607ef74d008ca2a334f2387877b9d628e6",
+                "name": "Nets",
+                "alias": "BKN",
+                "market": "Brooklyn"
+            },
+            "away": {
+                "teamId": "8c88a0867c945d6563fbbadf69602c09d183ff2e",
+                "name": "Timberwolves",
+                "alias": "MIN",
+                "market": "Minnesota"
+            },
+            "dayOfWeek": 0,
+            "timezone": "US/Eastern"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "d3bdd01a568286eb9da4ff054ddde983747bb8a4",
+            "scheduledTime": "2025-11-03T01:00:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Mortgage Matchup Center",
+            "network": "AZFamily/Suns+/FDSSW",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "64a9639ddc116893584736c716944ed20b9f588d",
+                "name": "Suns",
+                "alias": "PHX",
+                "market": "Phoenix"
+            },
+            "away": {
+                "teamId": "ce7339707a081631ad27504e39b4863d66ed7b00",
+                "name": "Spurs",
+                "alias": "SAS",
+                "market": "San Antonio"
+            },
+            "dayOfWeek": 6,
+            "timezone": "US/Arizona"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "75306cf788af100469ca5160a2bfbc14410e7abd",
+            "scheduledTime": "2026-01-19T22:00:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Madison Square Garden",
+            "network": "NBC/Peacock",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "d4830db7b74148699bbbadb73e577b3ca942bd3d",
+                "name": "Knicks",
+                "alias": "NYK",
+                "market": "New York"
+            },
+            "away": {
+                "teamId": "4f53719cd0222b154b2c0e8cfba04afca9ef2aff",
+                "name": "Mavericks",
+                "alias": "DAL",
+                "market": "Dallas"
+            },
+            "dayOfWeek": 0,
+            "timezone": "US/Eastern"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "30a9d0fa2ed533da8e64722c9fc3b990b00a812b",
+            "scheduledTime": "2025-11-05T04:00:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Intuit Dome",
+            "network": "NBC/Peacock",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "e4c5f21b07ab9862386ae653e7e993c499e152c9",
+                "name": "Clippers",
+                "alias": "LAC",
+                "market": "LA"
+            },
+            "away": {
+                "teamId": "a61f9df311814fb4446ddc13ca7b8d00fa67743c",
+                "name": "Thunder",
+                "alias": "OKC",
+                "market": "Oklahoma City"
+            },
+            "dayOfWeek": 1,
+            "timezone": "US/Pacific"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "42217dc04ac419152e8427e1cb9125880e141ff8",
+            "scheduledTime": "2025-11-02T23:00:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Spectrum Center",
+            "network": "FDSSE/KJZZ/Jazz+",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "5ba6dc6435ee643d67ce8e8607e9182812ceb766",
+                "name": "Hornets",
+                "alias": "CHA",
+                "market": "Charlotte"
+            },
+            "away": {
+                "teamId": "caa89c26e33d09acbb2fdf2eae3f5a2d4538da8e",
+                "name": "Jazz",
+                "alias": "UTA",
+                "market": "Utah"
+            },
+            "dayOfWeek": 6,
+            "timezone": "US/Eastern"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "7125a9d0e4933d1f2bb6be2f11ce37bc862a63b6",
+            "scheduledTime": "2025-11-02T23:00:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Scotiabank Arena",
+            "network": "FDSSE/SportsNet",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "d9c2ca26b7570dcd8895a3cce018787a4e3c46de",
+                "name": "Raptors",
+                "alias": "TOR",
+                "market": "Toronto"
+            },
+            "away": {
+                "teamId": "8b8991f626a4178b6cc48aa9a5da8881a8807999",
+                "name": "Grizzlies",
+                "alias": "MEM",
+                "market": "Memphis"
+            },
+            "dayOfWeek": 6,
+            "timezone": "US/Eastern"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "7dcdc84030bad57e48463f9e6d7387fa91e90a44",
+            "scheduledTime": "2025-11-03T00:00:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Madison Square Garden",
+            "network": "CHSN/MSG",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "d4830db7b74148699bbbadb73e577b3ca942bd3d",
+                "name": "Knicks",
+                "alias": "NYK",
+                "market": "New York"
+            },
+            "away": {
+                "teamId": "94df91d4a18186b5497c674a59bd3053f3bfa662",
+                "name": "Bulls",
+                "alias": "CHI",
+                "market": "Chicago"
+            },
+            "dayOfWeek": 6,
+            "timezone": "US/Eastern"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "7df3886e1254ac21117d3c4dc0c23a2c56731857",
+            "scheduledTime": "2025-11-02T23:00:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Barclays Center",
+            "network": "YES/NBCS-PH",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "057435607ef74d008ca2a334f2387877b9d628e6",
+                "name": "Nets",
+                "alias": "BKN",
+                "market": "Brooklyn"
+            },
+            "away": {
+                "teamId": "5a97ad62cb6aa70cb471cda6a5bc728b760128b3",
+                "name": "76ers",
+                "alias": "PHI",
+                "market": "Philadelphia"
+            },
+            "dayOfWeek": 6,
+            "timezone": "US/Eastern"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "8296541f6030cde9811ea27221aa14c2b85b6e6c",
+            "scheduledTime": "2025-12-26T03:30:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Ball Arena",
+            "network": "ABC/ESPN",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "ca6a4f58f8c0e2e620fbe3043feb34a968dc178e",
+                "name": "Nuggets",
+                "alias": "DEN",
+                "market": "Denver"
+            },
+            "away": {
+                "teamId": "8c88a0867c945d6563fbbadf69602c09d183ff2e",
+                "name": "Timberwolves",
+                "alias": "MIN",
+                "market": "Minnesota"
+            },
+            "dayOfWeek": 3,
+            "timezone": "US/Mountain"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "b5f4c3c7c2385aea9ce388033aac88dc6d1c43af",
+            "scheduledTime": "2025-11-04T03:00:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Moda Center",
+            "network": "KUNP/SportsNet LA/NBA TV",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "94c72bbe4757aea9120d7a9d5e761cf53534d916",
+                "name": "Trail Blazers",
+                "alias": "POR",
+                "market": "Portland"
+            },
+            "away": {
+                "teamId": "33058411c48f4f3e3aa2b9cb27a261f467daafbb",
+                "name": "Lakers",
+                "alias": "LAL",
+                "market": "Los Angeles"
+            },
+            "dayOfWeek": 0,
+            "timezone": "US/Pacific"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "24a895c7196d8b158d590dcd7ce5fb572dcd475d",
+            "scheduledTime": "2025-11-02T23:00:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Rocket Arena",
+            "network": "FDSSE/FDSOH",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "c34ab8c13790a5ba1f3621df877294e0dfeedfa2",
+                "name": "Cavaliers",
+                "alias": "CLE",
+                "market": "Cleveland"
+            },
+            "away": {
+                "teamId": "50e38c06612b7be8a786db15f2320f52a51fdf2b",
+                "name": "Hawks",
+                "alias": "ATL",
+                "market": "Atlanta"
+            },
+            "dayOfWeek": 6,
+            "timezone": "US/Eastern"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "c4588148b0b18c36a1ee173c8de4ae103ea6fd58",
+            "scheduledTime": "2025-11-01T21:00:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Fiserv Forum",
+            "network": "FDSWI/NBCS-CA",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "88387c0cdf52ebd38dea58d13ebd5705330f3842",
+                "name": "Bucks",
+                "alias": "MIL",
+                "market": "Milwaukee"
+            },
+            "away": {
+                "teamId": "6092f749157f79f903cad855769b66912c04b078",
+                "name": "Kings",
+                "alias": "SAC",
+                "market": "Sacramento"
+            },
+            "dayOfWeek": 5,
+            "timezone": "US/Central"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "7f385d124f8a89539b766a3102596ed66c3224e0",
+            "scheduledTime": "2025-11-01T00:00:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "United Center",
+            "network": "CHSN/MSG",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "94df91d4a18186b5497c674a59bd3053f3bfa662",
+                "name": "Bulls",
+                "alias": "CHI",
+                "market": "Chicago"
+            },
+            "away": {
+                "teamId": "d4830db7b74148699bbbadb73e577b3ca942bd3d",
+                "name": "Knicks",
+                "alias": "NYK",
+                "market": "New York"
+            },
+            "dayOfWeek": 4,
+            "timezone": "US/Central"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "49dc2cbe91e5697b2d2129e8cb04b3536c7d58c5",
+            "scheduledTime": "2025-11-04T00:30:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Madison Square Garden",
+            "network": "MSG/MNMT",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "d4830db7b74148699bbbadb73e577b3ca942bd3d",
+                "name": "Knicks",
+                "alias": "NYK",
+                "market": "New York"
+            },
+            "away": {
+                "teamId": "e80e082eaa06746ecdd8b11ef2348837bb30a3ba",
+                "name": "Wizards",
+                "alias": "WAS",
+                "market": "Washington"
+            },
+            "dayOfWeek": 0,
+            "timezone": "US/Eastern"
+        },
+        {
+            "leagueId": "NBA",
+            "eventId": "c7c478ee6f095bbea127ce831967f80e026317c1",
+            "scheduledTime": "2025-11-04T00:00:00+00:00",
+            "live": false,
+            "status": "pregame",
+            "venue": "Gainbridge Fieldhouse",
+            "network": "FDSIN/FDSWI",
+            "season": 2025,
+            "code": "REG",
+            "home": {
+                "teamId": "2748781441a54cb858c43de2e1d3008c633b7811",
+                "name": "Pacers",
+                "alias": "IND",
+                "market": "Indiana"
+            },
+            "away": {
+                "teamId": "88387c0cdf52ebd38dea58d13ebd5705330f3842",
+                "name": "Bucks",
+                "alias": "MIL",
+                "market": "Milwaukee"
+            },
+            "dayOfWeek": 0,
+            "timezone": "US/Eastern"
         }
     ]
 }
