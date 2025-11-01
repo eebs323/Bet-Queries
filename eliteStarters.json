@@ -1,0 +1,42 @@
+{"player":"Nikola Jokic","team":"Denver Nuggets","positions":["C"],"tier":"S","archetypes":["Point Center","Playmaking Hub"],"notes":"MVP level engine"}
+{"player":"Giannis Antetokounmpo","team":"Milwaukee Bucks","positions":["PF","C"],"tier":"S","archetypes":["Slashing Big","Transition Force"],"notes":"All NBA perennial"}
+{"player":"Luka Doncic","team":"Dallas Mavericks","positions":["PG","SG"],"tier":"S","archetypes":["Helio Creator","Pick and Roll Maestro"],"notes":"MVP level shot creator"}
+{"player":"Joel Embiid","team":"Philadelphia 76ers","positions":["C"],"tier":"S","archetypes":["Post Scorer","Rim Protector"],"notes":"MVP winner when healthy"}
+{"player":"Shai Gilgeous-Alexander","team":"Oklahoma City Thunder","positions":["PG","SG"],"tier":"S","archetypes":["Three Level Scorer","POA Defender"],"notes":"Top two way guard"}
+{"player":"Jayson Tatum","team":"Boston Celtics","positions":["SF","PF"],"tier":"S","archetypes":["Two Way Wing","Shot Maker"],"notes":"All NBA first team caliber"}
+{"player":"Stephen Curry","team":"Golden State Warriors","positions":["PG"],"tier":"S","archetypes":["Off Ball Gravity","Pull Up Threat"],"notes":"Historic shooter"}
+{"player":"Kevin Durant","team":"Phoenix Suns","positions":["SF","PF"],"tier":"S","archetypes":["Shot Maker","Stretch Forward"],"notes":"Elite scorer"}
+{"player":"Anthony Davis","team":"Los Angeles Lakers","positions":["C","PF"],"tier":"S","archetypes":["Rim Protector","Roll Threat"],"notes":"DPOY level defense"}
+{"player":"Kawhi Leonard","team":"Los Angeles Clippers","positions":["SF"],"tier":"S","archetypes":["Two Way Wing","Isolation Scorer"],"notes":"Elite when available"}
+{"player":"Devin Booker","team":"Phoenix Suns","positions":["SG","PG"],"tier":"A","archetypes":["Three Level Scorer","Secondary Playmaker"],"notes":"All NBA level"}
+{"player":"Anthony Edwards","team":"Minnesota Timberwolves","positions":["SG","SF"],"tier":"A","archetypes":["Power Guard","Two Way Wing"],"notes":"Rising MVP tier"}
+{"player":"LeBron James","team":"Los Angeles Lakers","positions":["SF","PF","PG"],"tier":"A","archetypes":["Point Forward","Shot Creator"],"notes":"Still elite impact"}
+{"player":"Jaylen Brown","team":"Boston Celtics","positions":["SG","SF"],"tier":"A","archetypes":["Two Way Wing","Slasher"],"notes":"All NBA caliber"}
+{"player":"Jimmy Butler","team":"Miami Heat","positions":["SF","PF"],"tier":"A","archetypes":["Two Way Wing","Midrange Playmaker"],"notes":"High playoff impact"}
+{"player":"Tyrese Haliburton","team":"Indiana Pacers","positions":["PG"],"tier":"A","archetypes":["Pick and Roll Playmaker","Pull Up Shooter"],"notes":"Elite table setter"}
+{"player":"Jalen Brunson","team":"New York Knicks","positions":["PG"],"tier":"A","archetypes":["Pick and Roll Scorer","Clutch Creator"],"notes":"All NBA guard"}
+{"player":"Donovan Mitchell","team":"Cleveland Cavaliers","positions":["SG"],"tier":"A","archetypes":["Shot Creator","Pull Up Threat"],"notes":"Elite scoring guard"}
+{"player":"Damian Lillard","team":"Milwaukee Bucks","positions":["PG"],"tier":"A","archetypes":["Deep Range Shooter","PNR Scorer"],"notes":"Elite offense"}
+{"player":"Kyrie Irving","team":"Dallas Mavericks","positions":["PG","SG"],"tier":"A","archetypes":["Handle Wizard","Shot Maker"],"notes":"Elite efficiency"}
+{"player":"Paul George","team":"Philadelphia 76ers","positions":["SG","SF"],"tier":"A","archetypes":["Two Way Wing","Movement Shooter"],"notes":"Switchable defense"}
+{"player":"Bam Adebayo","team":"Miami Heat","positions":["C"],"tier":"A","archetypes":["Switch Big","Hand Off Hub"],"notes":"DPOY tier big"}
+{"player":"Victor Wembanyama","team":"San Antonio Spurs","positions":["C","PF"],"tier":"A","archetypes":["Rim Protector","Stretch Big"],"notes":"Generational defender"}
+{"player":"Domantas Sabonis","team":"Sacramento Kings","positions":["C"],"tier":"A","archetypes":["DHO Hub","Rebounding Big"],"notes":"Elite offense engine"}
+{"player":"DeAaron Fox","team":"Sacramento Kings","positions":["PG"],"tier":"A","archetypes":["Speed Guard","Pull Up Midrange"],"notes":"All Star level"}
+{"player":"Jamal Murray","team":"Denver Nuggets","positions":["PG"],"tier":"A","archetypes":["PNR Scorer","Secondary Playmaker"],"notes":"High playoff impact"}
+{"player":"Rudy Gobert","team":"Minnesota Timberwolves","positions":["C"],"tier":"A","archetypes":["Drop Anchor","Rim Finisher"],"notes":"DPOY anchor"}
+{"player":"Jaren Jackson Jr.","team":"Memphis Grizzlies","positions":["PF","C"],"tier":"A","archetypes":["Weakside Rim Protector","Stretch Big"],"notes":"DPOY level tools"}
+{"player":"Zion Williamson","team":"New Orleans Pelicans","positions":["PF"],"tier":"A","archetypes":["Power Finisher","Slasher"],"notes":"Elite rim pressure"}
+{"player":"Kyrie Irving","team":"Dallas Mavericks","positions":["PG","SG"],"tier":"A","archetypes":["Handle Wizard","Shot Maker"],"notes":"Dup removed if deduping"}
+{"player":"Trae Young","team":"Atlanta Hawks","positions":["PG"],"tier":"A","archetypes":["Pick and Roll Playmaker","Deep Range Shooter"],"notes":"Elite offense engine"}
+{"player":"Khris Middleton","team":"Milwaukee Bucks","positions":["SF","PF"],"tier":"B","archetypes":["Two Way Wing","Secondary Creator"],"notes":"High level starter"}
+{"player":"Jrue Holiday","team":"Boston Celtics","positions":["PG","SG"],"tier":"A","archetypes":["POA Defender","Connective Playmaker"],"notes":"Elite guard defense"}
+{"player":"Lauri Markkanen","team":"Utah Jazz","positions":["PF","SF"],"tier":"A","archetypes":["Stretch Scorer","Off Movement Shooter"],"notes":"All Star level"}
+{"player":"Pascal Siakam","team":"Indiana Pacers","positions":["PF","C"],"tier":"A","archetypes":["Face Up Big","Two Way Forward"],"notes":"All NBA fringe"}
+{"player":"Kawhi Leonard","team":"Los Angeles Clippers","positions":["SF"],"tier":"S","archetypes":["Two Way Wing","Isolation Scorer"],"notes":"Dup remove if needed"}
+{"player":"Anthony Edwards","team":"Minnesota Timberwolves","positions":["SG","SF"],"tier":"A","archetypes":["Power Guard","Two Way Wing"],"notes":"Dup remove if needed"}
+{"player":"Karl-Anthony Towns","team":"New York Knicks","positions":["C","PF"],"tier":"A","archetypes":["Stretch Big","Pick and Pop"],"notes":"Elite shooting big"}
+{"player":"Chet Holmgren","team":"Oklahoma City Thunder","positions":["C","PF"],"tier":"A","archetypes":["Rim Protector","Stretch Big"],"notes":"High impact starter"}
+{"player":"Tyrese Maxey","team":"Philadelphia 76ers","positions":["PG","SG"],"tier":"A","archetypes":["Speed Guard","Three Level Scorer"],"notes":"All Star guard"}
+{"player":"DeMar DeRozan","team":"Sacramento Kings","positions":["SF","SG"],"tier":"B","archetypes":["Midrange Scorer","Playmaker"],"notes":"Veteran elite scoring"}
+{"player":"Donovan Mitchell","team":"Cleveland Cavaliers","positions":["SG"],"tier":"A","archetypes":["Shot Creator","Pull Up Threat"],"notes":"Dup remove if needed"}

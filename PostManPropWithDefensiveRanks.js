@@ -1293,7 +1293,11 @@ function buildRecommendedSlips(rows) {
     const goblinMixSlips = buildGoblinMixSlips(safeGoblins, safeRegulars);
     slips.push(...goblinMixSlips);
   
-    // 8. VALUE HUNTERS: High edge but slightly lower hit rates (3-4 picks)
+    // 8. ELITE STARS: Safest non-goblin props for elite starters
+    const eliteStarsSlip = buildEliteStarsSlip(rows);
+    if (eliteStarsSlip) slips.push(eliteStarsSlip);
+  
+    // 9. VALUE HUNTERS: High edge but slightly lower hit rates (3-4 picks)
     const valueSlips = buildValueHunterSlips(rows);
     slips.push(...valueSlips);
   
@@ -1663,6 +1667,158 @@ function buildRecommendedSlips(rows) {
     }
     
     return slips;
+  }
+  
+  // Load elite starters list
+  function loadEliteStarters() {
+    try {
+      // First try to load from Postman globals
+      if (typeof pm !== 'undefined' && pm.globals) {
+        try {
+          const pmGlobal = pm.globals.get('EliteStarters');
+          if (pmGlobal) {
+            const parsed = JSON.parse(pmGlobal);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              console.log(`✅ Loaded ${parsed.length} elite starters from Postman globals`);
+              return parsed;
+            }
+          }
+        } catch (pmError) {
+          console.log('⚠️ Could not load from Postman globals:', pmError.message);
+        }
+      }
+      
+      // Fall back to file system for Node.js environment
+      if (typeof require !== 'undefined' && typeof process !== 'undefined') {
+        const fs = require('fs');
+        const path = require('path');
+        const filePath = path.join(__dirname || process.cwd(), 'eliteStarters.json');
+        const content = fs.readFileSync(filePath, 'utf8');
+        // Parse JSONL format (one JSON object per line)
+        const parsed = content.trim().split('\n').map(line => JSON.parse(line));
+        console.log(`✅ Loaded ${parsed.length} elite starters from file`);
+        return parsed;
+      }
+      
+      console.log('⚠️ No elite starters source available');
+      return [];
+    } catch (e) {
+      console.log('❌ Error loading eliteStarters:', e.message);
+      return [];
+    }
+  }
+  
+  // Build elite stars slip (safest non-goblin props for elite players)
+  function buildEliteStarsSlip(rows) {
+    const eliteStarters = loadEliteStarters();
+    if (eliteStarters.length === 0) {
+      console.log('⚠️ Elite Stars slip skipped: No elite starters loaded');
+      return null;
+    }
+    
+    console.log(`🌟 Building Elite Stars slip with ${eliteStarters.length} elite players`);
+    
+    // Create set of elite player names (normalized)
+    const eliteNames = new Set(
+      eliteStarters.map(p => p.player.toLowerCase().trim())
+    );
+    
+    // Find all non-goblin props for elite players
+    const eliteProps = rows.filter(r => {
+      if (r._isGoblin) return false; // Must not be goblin
+      if (!r.edgeGapPct || r.edgeGapPct <= 0) return false; // Must have positive edge
+      if (!r.approvalTag || !r.approvalTag.includes('✅')) return false; // Must be approved
+      
+      // Extract player name from the display string
+      // Format: "[Over] Player Name - Stat vs Opponent"
+      const playerMatch = r.player.match(/\[(?:Over|Under)\]\s+(.+?)\s+-\s+/);
+      if (!playerMatch) return false;
+      
+      const playerName = playerMatch[1].toLowerCase().trim();
+      
+      // Check if this player is in elite list (fuzzy match for partial names)
+      for (const eliteName of eliteNames) {
+        if (playerName.includes(eliteName) || eliteName.includes(playerName)) {
+          return true;
+        }
+      }
+      return false;
+    });
+    
+    console.log(`   Found ${eliteProps.length} props for elite players`);
+    
+    if (eliteProps.length < 3) {
+      console.log('⚠️ Elite Stars slip skipped: Not enough props (need 3+)');
+      return null;
+    }
+    
+    // Group by player
+    const byPlayer = new Map();
+    eliteProps.forEach(prop => {
+      const playerMatch = prop.player.match(/\[(?:Over|Under)\]\s+(.+?)\s+-\s+/);
+      if (!playerMatch) return;
+      
+      const playerName = playerMatch[1];
+      if (!byPlayer.has(playerName)) {
+        byPlayer.set(playerName, []);
+      }
+      byPlayer.get(playerName).push(prop);
+    });
+    
+    // Select the safest prop for each elite player (highest H2H + L10 + L5)
+    const safestPerPlayer = [];
+    byPlayer.forEach((props, playerName) => {
+      // Sort by safety score
+      const sorted = props.sort((a, b) => {
+        const safetyA = (a.h2h * 0.4) + (a.l10 * 0.3) + (a.l5 * 0.2) + (Math.min(100, a.edgeGapPct) / 100 * 0.1);
+        const safetyB = (b.h2h * 0.4) + (b.l10 * 0.3) + (b.l5 * 0.2) + (Math.min(100, b.edgeGapPct) / 100 * 0.1);
+        return safetyB - safetyA;
+      });
+      safestPerPlayer.push(sorted[0]);
+    });
+    
+    console.log(`   Selected safest prop for ${safestPerPlayer.length} elite players`);
+    
+    if (safestPerPlayer.length < 3) {
+      console.log('⚠️ Elite Stars slip skipped: Not enough unique players (need 3+)');
+      return null;
+    }
+    
+    // Take top 5-6 by rating
+    const topElite = safestPerPlayer
+      .sort((a, b) => {
+        // Sort by combined rating (edge + stats)
+        const ratingA = (a.h2h + a.l10 + a.l5) / 3 + (a.edgeGapPct / 100);
+        const ratingB = (b.h2h + b.l10 + b.l5) / 3 + (b.edgeGapPct / 100);
+        return ratingB - ratingA;
+      })
+      .slice(0, 6);
+    
+    console.log(`   Built Elite Stars slip with ${topElite.length} picks`);
+    
+    if (topElite.length < 3) return null;
+    
+    const pEsts = topElite.map(estPEstForRow).filter(Number.isFinite);
+    const pWin = pEsts.length === topElite.length ? product(pEsts) : null;
+    const totalGap = topElite.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
+    const { rating, ratingClass } = calculateSlipRating(topElite);
+    const { riskLevel, riskClass } = getRiskLevel(topElite);
+    const avgEdge = (totalGap / topElite.length).toFixed(1);
+    
+    return {
+      title: `⭐ Elite Stars (${topElite.length}-pick)`,
+      size: topElite.length,
+      bucket: "Elite Stars",
+      sortBasis: "Safety + Edge",
+      pctWin: pWin ? pct(pWin) : "—",
+      legs: topElite.map(leg => formatLegForDisplay(leg)),
+      totalGap,
+      rating,
+      ratingClass,
+      riskLevel,
+      riskClass,
+      why: `Safest non-goblin props for elite starters (avg ${avgEdge}% edge). Each player's most reliable prop selected.`
+    };
   }
   
   // Build value hunter slips (high edge but slightly lower hit rates)
