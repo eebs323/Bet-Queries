@@ -1276,7 +1276,11 @@ function buildRecommendedSlips(rows) {
     const goblinMixSlips = buildGoblinMixSlips(safeGoblins, safeRegulars);
     slips.push(...goblinMixSlips);
   
-    // 9. ALL GOBLINS SLIP: All safe goblins in one slip (moved to end)
+    // 9. TWO-MAN PARLAYS: Ultra-safe 2-leg combinations with LOW risk
+    const twoManParlays = build2ManParlays(safeRegulars);
+    slips.push(...twoManParlays);
+  
+    // 10. ALL GOBLINS SLIP: All safe goblins in one slip (moved to end)
     if (safeGoblins.length > 0) {
       const pEsts = safeGoblins.map(estPEstForRow).filter(Number.isFinite);
       const pWin = pEsts.length === safeGoblins.length ? product(pEsts) : null;
@@ -1665,6 +1669,110 @@ function buildRecommendedSlips(rows) {
       }
     }
     
+    return slips;
+  }
+  
+  // Build 2-man parlays with safe non-goblin picks
+  function build2ManParlays(safeRegulars) {
+    console.log(`🎯 Building 2-Man Parlays from ${safeRegulars.length} safe regulars`);
+    if (safeRegulars.length < 2) {
+      console.log('⚠️ Not enough safe regulars for 2-man parlays');
+      return [];
+    }
+    
+    const slips = [];
+    const maxParlays = 10; // Generate up to 10 two-leg parlays
+    
+    // Get the safest regulars with strongest stats
+    const ultraSafe = safeRegulars.filter(r => {
+      const stats = getBlendedStats({ l20: r.l20, l10: r.l10, l5: r.l5, h2h: r.h2h, curSeason: r.curSeason, prevSeason: r.prevSeason });
+      // Ultra safe: H2H >= 70%, L10 >= 65%, L5 >= 60% (slightly more lenient)
+      return stats.h2h >= 0.70 && stats.l10 >= 0.65 && stats.l5 >= 0.60;
+    }).sort((a, b) => {
+      // Sort by combined safety + edge
+      const safetyA = (a.h2h * 0.4) + (a.l10 * 0.3) + (a.l5 * 0.2) + (Math.min(100, a.edgeGapPct) / 100 * 0.1);
+      const safetyB = (b.h2h * 0.4) + (b.l10 * 0.3) + (b.l5 * 0.2) + (Math.min(100, b.edgeGapPct) / 100 * 0.1);
+      return safetyB - safetyA;
+    });
+    
+    console.log(`   Found ${ultraSafe.length} ultra-safe props for 2-man parlays`);
+    if (ultraSafe.length < 2) {
+      console.log('⚠️ Not enough ultra-safe props for 2-man parlays');
+      return [];
+    }
+    
+    const usedPlayers = new Set();
+    
+    // Create pairs ensuring diversity (different players, different teams when possible)
+    for (let i = 0; i < ultraSafe.length && slips.length < maxParlays; i++) {
+      const prop1 = ultraSafe[i];
+      
+      // Extract clean player name from format: "[Over] Player Name - Stat vs Team"
+      const player1Match = prop1.player.match(/\[(?:Over|Under)\]\s+(.+?)\s+-\s+/);
+      if (!player1Match) continue;
+      const player1Name = player1Match[1];
+      
+      if (usedPlayers.has(player1Name)) continue;
+      
+      for (let j = i + 1; j < ultraSafe.length && slips.length < maxParlays; j++) {
+        const prop2 = ultraSafe[j];
+        
+        // Extract clean player name
+        const player2Match = prop2.player.match(/\[(?:Over|Under)\]\s+(.+?)\s+-\s+/);
+        if (!player2Match) continue;
+        const player2Name = player2Match[1];
+        
+        if (usedPlayers.has(player2Name)) continue;
+        if (player1Name === player2Name) continue; // Same player check
+        
+        const pair = [prop1, prop2];
+        const pEsts = pair.map(estPEstForRow).filter(Number.isFinite);
+        const pWin = pEsts.length === pair.length ? product(pEsts) : null;
+        
+        // Only include if risk is LOW or MEDIUM
+        const { riskLevel, riskClass } = getRiskLevel(pair);
+        if (riskLevel !== 'LOW' && riskLevel !== 'MEDIUM') continue;
+        
+        const totalGap = pair.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
+        const { rating, ratingClass } = calculateSlipRating(pair);
+        
+        // Calculate parlay odds - use PP_odds or AVG_ODDS
+        const odds1Str = prop1.PP_odds || prop1.AVG_ODDS || "";
+        const odds2Str = prop2.PP_odds || prop2.AVG_ODDS || "";
+        const americanOdds1 = parseInt(odds1Str.replace(/[^-\d]/g, '')) || 0;
+        const americanOdds2 = parseInt(odds2Str.replace(/[^-\d]/g, '')) || 0;
+        let parlayOdds = "N/A";
+        
+        if (americanOdds1 && americanOdds2) {
+          const decimal1 = americanOdds1 < 0 ? (100 / Math.abs(americanOdds1)) + 1 : (americanOdds1 / 100) + 1;
+          const decimal2 = americanOdds2 < 0 ? (100 / Math.abs(americanOdds2)) + 1 : (americanOdds2 / 100) + 1;
+          const parlayDecimal = decimal1 * decimal2;
+          const parlayAmerican = parlayDecimal >= 2 ? Math.round((parlayDecimal - 1) * 100) : Math.round(-100 / (parlayDecimal - 1));
+          parlayOdds = parlayAmerican >= 0 ? `+${parlayAmerican}` : `${parlayAmerican}`;
+        }
+        
+        slips.push({
+          title: `🎯 2-Leg: ${player1Name} + ${player2Name} (${parlayOdds})`,
+          size: 2,
+          bucket: "2-Man Parlay",
+          sortBasis: "Safety",
+          pctWin: pWin ? pct(pWin) : "—",
+          legs: pair.map(leg => formatLegForDisplay(leg)),
+          totalGap,
+          rating,
+          ratingClass,
+          riskLevel,
+          riskClass,
+          why: `Ultra-safe 2-leg parlay with strong hit rates across all metrics (${parlayOdds} odds).`
+        });
+        
+        usedPlayers.add(player1Name);
+        usedPlayers.add(player2Name);
+        break; // Move to next prop1
+      }
+    }
+    
+    console.log(`   Generated ${slips.length} 2-man parlays`);
     return slips;
   }
   
