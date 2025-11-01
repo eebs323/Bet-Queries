@@ -135,7 +135,6 @@ const CompetitionId = {
               {{#if isGoblin}}👿 {{/if}}<span class="{{trendClass}}">{{trendIndicator}}</span> {{playerName}} - {{type}} {{line}} vs {{opponentName}}
               <span class="gap">{{edgeNote}}</span>
               <div class="detail">
-                {{type}} {{line}}
                 <div class="stats-grid">
                   <div class="stat-item">L20: <span class="{{l20Color}}">{{l20}}</span></div>
                   <div class="stat-item">L10: <span class="{{l10Color}}">{{l10}}</span></div>
@@ -1242,7 +1241,42 @@ function buildRecommendedSlips(rows) {
         console.log(`   Safe regulars: ${safeRegulars.length}`);
     }
 
-    // 1. GOBLIN SLIP: All safe goblins in one slip
+    // 1. MEGA SLIP: Best overall combination (6→5→4→3)
+    const mega = buildMegaSlip(rows);
+    if (mega) slips.push(mega);
+  
+    // 2. ELITE STARS: Safest non-goblin props for elite starters
+    const eliteStarsSlip = buildEliteStarsSlip(rows);
+    if (eliteStarsSlip) slips.push(eliteStarsSlip);
+  
+    // 3. ELITE TIER: Top 10% by edge (4-6 picks)
+    const eliteCount = Math.min(6, Math.max(4, Math.floor(safeRegulars.length * 0.1)));
+    if (safeRegulars.length >= 4) {
+      const eliteSlip = buildTieredSlip(safeRegulars.slice(0, eliteCount), "Elite", "🏆");
+      if (eliteSlip) slips.push(eliteSlip);
+    }
+  
+    // 4. TRENDING UP: All props with improving form (L5 > L10)
+    const trendingSlip = buildTrendingUpSlip(safeRegulars);
+    if (trendingSlip) slips.push(trendingSlip);
+  
+    // 5. VALUE HUNTERS: High edge but slightly lower hit rates (3-4 picks)
+    const valueSlips = buildValueHunterSlips(rows);
+    slips.push(...valueSlips);
+  
+    // 6. BALANCED PORTFOLIOS: Mix edge tiers with risk management (3-5 picks each)
+    const portfolioSlips = buildBalancedPortfolios(safeRegulars);
+    slips.push(...portfolioSlips);
+  
+    // 7. SAME GAME PARLAYS: Group by event/team for correlation
+    const sameGameSlips = buildSameGameParlays(safeRegulars);
+    slips.push(...sameGameSlips);
+  
+    // 8. GOBLIN MIX SLIPS: Blend safest goblins with regulars (2-3 slips)
+    const goblinMixSlips = buildGoblinMixSlips(safeGoblins, safeRegulars);
+    slips.push(...goblinMixSlips);
+  
+    // 9. ALL GOBLINS SLIP: All safe goblins in one slip (moved to end)
     if (safeGoblins.length > 0) {
       const pEsts = safeGoblins.map(estPEstForRow).filter(Number.isFinite);
       const pWin = pEsts.length === safeGoblins.length ? product(pEsts) : null;
@@ -1265,41 +1299,6 @@ function buildRecommendedSlips(rows) {
         why: "All qualifying Goblins with positive Edge Gaps that pass strict hit-rate filters."
       });
     }
-  
-    // 2. ELITE TIER: Top 10% by edge (4-6 picks)
-    const eliteCount = Math.min(6, Math.max(4, Math.floor(safeRegulars.length * 0.1)));
-    if (safeRegulars.length >= 4) {
-      const eliteSlip = buildTieredSlip(safeRegulars.slice(0, eliteCount), "Elite", "🏆");
-      if (eliteSlip) slips.push(eliteSlip);
-    }
-  
-    // 3. SAME GAME PARLAYS: Group by event/team for correlation
-    const sameGameSlips = buildSameGameParlays(safeRegulars);
-    slips.push(...sameGameSlips);
-  
-    // 4. BALANCED PORTFOLIOS: Mix edge tiers with risk management (3-5 picks each)
-    const portfolioSlips = buildBalancedPortfolios(safeRegulars);
-    slips.push(...portfolioSlips);
-  
-    // 5. MEGA SLIP: Best overall combination (6→5→4→3)
-    const mega = buildMegaSlip(rows);
-    if (mega) slips.push(mega);
-  
-    // 6. TRENDING UP: All props with improving form (L5 > L10)
-    const trendingSlip = buildTrendingUpSlip(safeRegulars);
-    if (trendingSlip) slips.push(trendingSlip);
-  
-    // 7. GOBLIN MIX SLIPS: Blend safest goblins with regulars (2-3 slips)
-    const goblinMixSlips = buildGoblinMixSlips(safeGoblins, safeRegulars);
-    slips.push(...goblinMixSlips);
-  
-    // 8. ELITE STARS: Safest non-goblin props for elite starters
-    const eliteStarsSlip = buildEliteStarsSlip(rows);
-    if (eliteStarsSlip) slips.push(eliteStarsSlip);
-  
-    // 9. VALUE HUNTERS: High edge but slightly lower hit rates (3-4 picks)
-    const valueSlips = buildValueHunterSlips(rows);
-    slips.push(...valueSlips);
   
     return slips;
   }
