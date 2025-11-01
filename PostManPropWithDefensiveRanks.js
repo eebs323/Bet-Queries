@@ -65,6 +65,8 @@ const CompetitionId = {
       .trend-neutral { color: #ff8c00; font-weight: bold; }
       .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 4px; margin-top: 4px; }
       .stat-item { font-size: 11px; }
+      .odds-badge { font-size: 11px; padding: 2px 6px; border-radius: 4px; background: #e3f2fd; color: #1976d2; font-weight: 600; margin-left: 6px; }
+      .parlay-odds { font-size: 14px; padding: 3px 10px; border-radius: 6px; background: #1976d2; color: white; font-weight: bold; margin-left: 8px; }
     </style>
   
     <div class="table-wrap">
@@ -117,6 +119,7 @@ const CompetitionId = {
         <div class="card-header">
           <h3>
             {{title}}
+            {{#if parlayOdds}}<span class="parlay-odds">{{parlayOdds}}</span>{{/if}}
             <span class="prob">{{pctWin}}%</span>
           </h3>
           <div class="card-rating">
@@ -124,6 +127,8 @@ const CompetitionId = {
               Rating: {{rating}}/10
             </span>
             <span class="rating-pill">Avg Edge: {{avgEdge}}%</span>
+            {{#if avgOdds}}<span class="rating-pill">Avg Odds: {{avgOdds}}</span>{{/if}}
+            {{#if parlayOdds}}<span class="rating-pill">Parlay: {{parlayOdds}}</span>{{/if}}
             <span class="rating-pill {{riskClass}}">
               Risk: {{riskLevel}}
             </span>
@@ -133,6 +138,7 @@ const CompetitionId = {
           {{#each legs}}
             <li>
               {{#if isGoblin}}👿 {{/if}}<span class="{{trendClass}}">{{trendIndicator}}</span> {{playerName}} - {{type}} {{line}} vs {{opponentName}}
+              {{#if odds}}<span class="odds-badge">{{odds}}</span>{{/if}}
               <span class="gap">{{edgeNote}}</span>
               <div class="detail">
                 <div class="stats-grid">
@@ -1074,6 +1080,9 @@ function mapProps(item, filterType) {
 
     const { rating, ratingClass } = calculateSlipRating(legs);
     const { riskLevel, riskClass } = getRiskLevel(legs);
+    
+    const avgOdds = calculateAvgOdds(legs);
+    const parlayOdds = calculateParlayOdds(legs);
 
     return {
       title: `🎯 Mega ${legs.length}-Pick Slip`,
@@ -1089,6 +1098,8 @@ function mapProps(item, filterType) {
       ratingClass,
       riskLevel,
       riskClass,
+      avgOdds,
+      parlayOdds,
       why: "Props scored using weighted system: H2H (30%), Edge Gap (20%), L5 (20%), L10 (15%), Season (10%), Defense (5%). Bonus for improving trends."
     };
   }
@@ -1291,6 +1302,9 @@ function buildRecommendedSlips(rows) {
       const { rating, ratingClass } = calculateSlipRating(safeGoblins);
       const { riskLevel, riskClass } = getRiskLevel(safeGoblins);
       
+      const avgOdds = calculateAvgOdds(safeGoblins);
+      const parlayOdds = calculateParlayOdds(safeGoblins);
+      
       slips.push({
         title: `🎃 Safe Goblins (${safeGoblins.length}-pick)`,
         size: safeGoblins.length,
@@ -1304,6 +1318,8 @@ function buildRecommendedSlips(rows) {
         ratingClass,
         riskLevel,
         riskClass,
+        avgOdds,
+        parlayOdds,
         why: "All qualifying Goblins with positive Edge Gaps that pass strict hit-rate filters."
       });
     }
@@ -1343,6 +1359,9 @@ function buildRecommendedSlips(rows) {
     const { riskLevel, riskClass } = getRiskLevel(diverse);
     const avgEdge = (totalGap / diverse.length).toFixed(1);
     
+    const avgOdds = calculateAvgOdds(diverse);
+    const parlayOdds = calculateParlayOdds(diverse);
+    
     return {
       title: `${emoji} ${tierName} Tier (${diverse.length}-pick)`,
       size: diverse.length,
@@ -1356,6 +1375,8 @@ function buildRecommendedSlips(rows) {
       ratingClass,
       riskLevel,
       riskClass,
+      avgOdds,
+      parlayOdds,
       why: `Top ${tierName.toLowerCase()} props averaging ${avgEdge}% edge with diverse team coverage.`
     };
   }
@@ -1391,6 +1412,9 @@ function buildRecommendedSlips(rows) {
       const { rating, ratingClass } = calculateSlipRating(sgpLegs);
       const { riskLevel, riskClass } = getRiskLevel(sgpLegs);
       
+      const avgOdds = calculateAvgOdds(sgpLegs);
+      const parlayOdds = calculateParlayOdds(sgpLegs);
+      
       // Get game info from first prop
       const firstProp = sgpLegs[0];
       const teams = firstProp.player.split(" vs ");
@@ -1409,6 +1433,8 @@ function buildRecommendedSlips(rows) {
         ratingClass,
         riskLevel,
         riskClass,
+        avgOdds,
+        parlayOdds,
         why: `Same-game parlay with correlated props for increased likelihood.`
       });
       
@@ -1477,6 +1503,8 @@ function buildRecommendedSlips(rows) {
         ratingClass,
         riskLevel,
         riskClass,
+        avgOdds: calculateAvgOdds(portfolio),
+        parlayOdds: calculateParlayOdds(portfolio),
         why: `Balanced mix of high and medium edge props with diverse team exposure.`
       });
     }
@@ -1524,6 +1552,9 @@ function buildRecommendedSlips(rows) {
     const { riskLevel, riskClass } = getRiskLevel(diverse);
     const avgImprovement = (diverse.reduce((sum, p) => sum + (p.l5 - p.l10), 0) / diverse.length * 100).toFixed(0);
     
+    const avgOdds = calculateAvgOdds(diverse);
+    const parlayOdds = calculateParlayOdds(diverse);
+    
     return {
       title: `📈 Trending Up (${diverse.length}-pick)`,
       size: diverse.length,
@@ -1537,6 +1568,8 @@ function buildRecommendedSlips(rows) {
       ratingClass,
       riskLevel,
       riskClass,
+      avgOdds,
+      parlayOdds,
       why: `All props showing upward momentum (avg +${avgImprovement}% L5 vs L10 improvement).`
     };
   }
@@ -1592,6 +1625,8 @@ function buildRecommendedSlips(rows) {
           ratingClass,
           riskLevel,
           riskClass,
+          avgOdds: calculateAvgOdds(diverse),
+          parlayOdds: calculateParlayOdds(diverse),
           why: `${goblinCount} safest goblins blended with ${regularCount} elite regulars for balanced risk/reward.`
         });
       }
@@ -1638,6 +1673,8 @@ function buildRecommendedSlips(rows) {
           ratingClass,
           riskLevel,
           riskClass,
+          avgOdds: calculateAvgOdds(diverse),
+          parlayOdds: calculateParlayOdds(diverse),
           why: `1 ultra-safe goblin mixed with ${fourRegulars.length} top regulars for maximum stability.`
         });
       }
@@ -1681,6 +1718,8 @@ function buildRecommendedSlips(rows) {
           ratingClass,
           riskLevel,
           riskClass,
+          avgOdds: calculateAvgOdds(diverse),
+          parlayOdds: calculateParlayOdds(diverse),
           why: `3 safe goblins combined with ${twoRegulars.length} elite regulars for higher goblin exposure.`
         });
       }
@@ -1754,23 +1793,12 @@ function buildRecommendedSlips(rows) {
         const avgEdge = (totalGap / 2).toFixed(1);
         const { rating, ratingClass } = calculateSlipRating(pair);
         
-        // Calculate parlay odds - use PP_odds or AVG_ODDS
-        const odds1Str = prop1.PP_odds || prop1.AVG_ODDS || "";
-        const odds2Str = prop2.PP_odds || prop2.AVG_ODDS || "";
-        const americanOdds1 = parseInt(odds1Str.replace(/[^-\d]/g, '')) || 0;
-        const americanOdds2 = parseInt(odds2Str.replace(/[^-\d]/g, '')) || 0;
-        let parlayOdds = "N/A";
-        
-        if (americanOdds1 && americanOdds2) {
-          const decimal1 = americanOdds1 < 0 ? (100 / Math.abs(americanOdds1)) + 1 : (americanOdds1 / 100) + 1;
-          const decimal2 = americanOdds2 < 0 ? (100 / Math.abs(americanOdds2)) + 1 : (americanOdds2 / 100) + 1;
-          const parlayDecimal = decimal1 * decimal2;
-          const parlayAmerican = parlayDecimal >= 2 ? Math.round((parlayDecimal - 1) * 100) : Math.round(-100 / (parlayDecimal - 1));
-          parlayOdds = parlayAmerican >= 0 ? `+${parlayAmerican}` : `${parlayAmerican}`;
-        }
+        const avgOdds = calculateAvgOdds(pair);
+        const parlayOdds = calculateParlayOdds(pair);
+        const parlayOddsDisplay = parlayOdds || "N/A";
         
         slips.push({
-          title: `🎯 2-Leg: ${player1Name} + ${player2Name} (${parlayOdds})`,
+          title: `🎯 2-Leg: ${player1Name} + ${player2Name} (${parlayOddsDisplay})`,
           size: 2,
           bucket: "2-Man Parlay",
           sortBasis: "Safety",
@@ -1782,7 +1810,9 @@ function buildRecommendedSlips(rows) {
           ratingClass,
           riskLevel,
           riskClass,
-          why: `Ultra-safe 2-leg parlay with strong hit rates across all metrics (${parlayOdds} odds).`
+          avgOdds,
+          parlayOdds,
+          why: `Ultra-safe 2-leg parlay with strong hit rates across all metrics (${parlayOddsDisplay} odds).`
         });
         
         usedPlayers.add(player1Name);
@@ -1931,6 +1961,9 @@ function buildRecommendedSlips(rows) {
     const { riskLevel, riskClass } = getRiskLevel(topElite);
     const avgEdge = (totalGap / topElite.length).toFixed(1);
     
+    const avgOdds = calculateAvgOdds(topElite);
+    const parlayOdds = calculateParlayOdds(topElite);
+    
     return {
       title: `⭐ Elite Stars (${topElite.length}-pick)`,
       size: topElite.length,
@@ -1944,6 +1977,8 @@ function buildRecommendedSlips(rows) {
       ratingClass,
       riskLevel,
       riskClass,
+      avgOdds,
+      parlayOdds,
       why: `Safest non-goblin props for elite starters (avg ${avgEdge}% edge). Each player's most reliable prop selected.`
     };
   }
@@ -2000,6 +2035,8 @@ function buildRecommendedSlips(rows) {
           ratingClass,
           riskLevel,
           riskClass,
+          avgOdds: calculateAvgOdds(hunters),
+          parlayOdds: calculateParlayOdds(hunters),
           why: `High edge props (${(totalGap/hunters.length).toFixed(1)}% avg) with acceptable risk profiles.`
         });
       }
@@ -2009,6 +2046,81 @@ function buildRecommendedSlips(rows) {
   }
   
   // Format leg display consistently across all slip types
+  // Helper function to extract all sportsbook odds from a leg
+  function getAllSportsbookOdds(leg) {
+    const allOdds = [];
+    const sportsbookFields = ['CAESARS_odds', 'FANDUEL_odds', 'DK_odds', 'PP_odds', 'UD_odds', 'SleeperOdds', 'FLIFF_odds'];
+    
+    for (const field of sportsbookFields) {
+      if (leg[field]) {
+        const american = parseInt(leg[field].replace(/[^-\d]/g, '')) || 0;
+        if (american !== 0) {
+          allOdds.push(american);
+        }
+      }
+    }
+    
+    // If no sportsbook odds found, try AVG_ODDS as fallback
+    if (allOdds.length === 0 && leg.AVG_ODDS) {
+      const american = parseInt(String(leg.AVG_ODDS).replace(/[^-\d]/g, '')) || 0;
+      if (american !== 0) {
+        allOdds.push(american);
+      }
+    }
+    
+    return allOdds;
+  }
+  
+  // Calculate average odds from multiple legs using all sportsbook odds
+  function calculateAvgOdds(legs) {
+    if (!legs || legs.length === 0) return null;
+    
+    // Collect all odds from all sportsbooks for all legs
+    let allOddsDecimals = [];
+    
+    for (const leg of legs) {
+      const legOdds = getAllSportsbookOdds(leg);
+      // Convert to decimal and add to collection
+      const decimals = legOdds.map(american => 
+        american < 0 ? (100 / Math.abs(american)) + 1 : (american / 100) + 1
+      );
+      allOddsDecimals.push(...decimals);
+    }
+    
+    if (allOddsDecimals.length === 0) return null;
+    
+    // Average all decimal odds across all legs and sportsbooks
+    const avgDecimal = allOddsDecimals.reduce((sum, d) => sum + d, 0) / allOddsDecimals.length;
+    const avgAmerican = avgDecimal >= 2 ? Math.round((avgDecimal - 1) * 100) : Math.round(-100 / (avgDecimal - 1));
+    return avgAmerican >= 0 ? `+${avgAmerican}` : `${avgAmerican}`;
+  }
+  
+  // Calculate parlay odds from multiple legs using average of all sportsbook odds per leg
+  function calculateParlayOdds(legs) {
+    if (!legs || legs.length === 0) return null;
+    
+    const legAverages = [];
+    
+    for (const leg of legs) {
+      const legOdds = getAllSportsbookOdds(leg);
+      if (legOdds.length === 0) return null; // Need odds for all legs
+      
+      // Convert to decimal and average for this leg
+      const decimals = legOdds.map(american => 
+        american < 0 ? (100 / Math.abs(american)) + 1 : (american / 100) + 1
+      );
+      const avgDecimal = decimals.reduce((sum, d) => sum + d, 0) / decimals.length;
+      legAverages.push(avgDecimal);
+    }
+    
+    if (legAverages.length !== legs.length) return null;
+    
+    // Multiply the average decimal odds for each leg to get parlay odds
+    const parlayDecimal = legAverages.reduce((acc, odd) => acc * odd, 1);
+    const parlayAmerican = parlayDecimal >= 2 ? Math.round((parlayDecimal - 1) * 100) : Math.round(-100 / (parlayDecimal - 1));
+    return parlayAmerican >= 0 ? `+${parlayAmerican}` : `${parlayAmerican}`;
+  }
+
   function formatLegForDisplay(leg) {
     // Split the original player string to extract components
     const parts = leg.player.split(" vs ");
@@ -2024,11 +2136,24 @@ function buildRecommendedSlips(rows) {
     // Strip any existing prefixes and get clean player name
     const cleanPlayerName = playerInfo.replace(/^(👿\s*)?(PP:|SL:|O:)?\s*(\[(?:Over|Under)\]\s*)?/, "");
     
+    // Get odds display - average of all sportsbook odds
+    let odds = null;
+    const legOdds = getAllSportsbookOdds(leg);
+    if (legOdds.length > 0) {
+      const decimals = legOdds.map(american => 
+        american < 0 ? (100 / Math.abs(american)) + 1 : (american / 100) + 1
+      );
+      const avgDecimal = decimals.reduce((sum, d) => sum + d, 0) / decimals.length;
+      const avgAmerican = avgDecimal >= 2 ? Math.round((avgDecimal - 1) * 100) : Math.round(-100 / (avgDecimal - 1));
+      odds = avgAmerican >= 0 ? `+${avgAmerican}` : `${avgAmerican}`;
+    }
+    
     return {
       ...leg,
       isGoblin,
       playerName: cleanPlayerName,
       opponentName,
+      odds,
       trendIndicator,
       trendClass: trendIndicator === '↑' ? 'trend-up' : trendIndicator === '↓' ? 'trend-down' : 'trend-neutral'
     };
