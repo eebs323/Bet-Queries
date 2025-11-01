@@ -1289,7 +1289,11 @@ function buildRecommendedSlips(rows) {
     const trendingSlip = buildTrendingUpSlip(safeRegulars);
     if (trendingSlip) slips.push(trendingSlip);
   
-    // 7. VALUE HUNTERS: High edge but slightly lower hit rates (3-4 picks)
+    // 7. GOBLIN MIX SLIPS: Blend safest goblins with regulars (2-3 slips)
+    const goblinMixSlips = buildGoblinMixSlips(safeGoblins, safeRegulars);
+    slips.push(...goblinMixSlips);
+  
+    // 8. VALUE HUNTERS: High edge but slightly lower hit rates (3-4 picks)
     const valueSlips = buildValueHunterSlips(rows);
     slips.push(...valueSlips);
   
@@ -1517,6 +1521,148 @@ function buildRecommendedSlips(rows) {
       riskClass,
       why: `All props showing upward momentum (avg +${avgImprovement}% L5 vs L10 improvement).`
     };
+  }
+  
+  // Build goblin mix slips (blend safest goblins with regulars)
+  function buildGoblinMixSlips(safeGoblins, safeRegulars) {
+    if (safeGoblins.length < 2 || safeRegulars.length < 2) return [];
+    
+    const slips = [];
+    
+    // Strategy 1: "Goblin Boost" - 2 safest goblins + 3 elite regulars
+    if (safeGoblins.length >= 2 && safeRegulars.length >= 3) {
+      const topGoblins = safeGoblins.slice(0, 2); // Already sorted by safety
+      const topRegulars = safeRegulars.slice(0, 5);
+      
+      // Ensure diversity
+      const diverse = [...topGoblins];
+      const usedPlayers = new Set(topGoblins.map(p => p.player.replace(/\s+\(.+?\)$/, '')));
+      const usedTeams = new Set(topGoblins.map(p => p._teamId));
+      
+      for (const reg of topRegulars) {
+        const playerKey = reg.player.replace(/\s+\(.+?\)$/, '');
+        if (usedPlayers.has(playerKey)) continue;
+        if (diverse.length >= 3 && usedTeams.has(reg._teamId)) continue; // Prefer diversity
+        
+        diverse.push(reg);
+        usedPlayers.add(playerKey);
+        usedTeams.add(reg._teamId);
+        
+        if (diverse.length >= 5) break;
+      }
+      
+      if (diverse.length >= 4) {
+        const pEsts = diverse.map(estPEstForRow).filter(Number.isFinite);
+        const pWin = pEsts.length === diverse.length ? product(pEsts) : null;
+        const totalGap = diverse.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
+        const { rating, ratingClass } = calculateSlipRating(diverse);
+        const { riskLevel, riskClass } = getRiskLevel(diverse);
+        const goblinCount = diverse.filter(p => p._isGoblin).length;
+        const regularCount = diverse.length - goblinCount;
+        
+        slips.push({
+          title: `🎃⚡ Goblin Boost (${diverse.length}-pick: ${goblinCount}G + ${regularCount}R)`,
+          size: diverse.length,
+          bucket: "Goblin Mix",
+          sortBasis: "Blended",
+          pctWin: pWin ? pct(pWin) : "—",
+          legs: diverse.map(leg => formatLegForDisplay(leg)),
+          totalGap,
+          rating,
+          ratingClass,
+          riskLevel,
+          riskClass,
+          why: `${goblinCount} safest goblins blended with ${regularCount} elite regulars for balanced risk/reward.`
+        });
+      }
+    }
+    
+    // Strategy 2: "Conservative Mix" - 1 goblin + 4 regulars
+    if (safeGoblins.length >= 1 && safeRegulars.length >= 4) {
+      const oneGoblin = [safeGoblins[0]]; // Safest goblin
+      const fourRegulars = [];
+      const usedPlayers = new Set([safeGoblins[0].player.replace(/\s+\(.+?\)$/, '')]);
+      const usedTeams = new Set([safeGoblins[0]._teamId]);
+      
+      for (const reg of safeRegulars) {
+        const playerKey = reg.player.replace(/\s+\(.+?\)$/, '');
+        if (usedPlayers.has(playerKey)) continue;
+        if (usedTeams.has(reg._teamId)) continue; // Full diversity
+        
+        fourRegulars.push(reg);
+        usedPlayers.add(playerKey);
+        usedTeams.add(reg._teamId);
+        
+        if (fourRegulars.length >= 4) break;
+      }
+      
+      if (fourRegulars.length >= 3) {
+        const diverse = [...oneGoblin, ...fourRegulars];
+        const pEsts = diverse.map(estPEstForRow).filter(Number.isFinite);
+        const pWin = pEsts.length === diverse.length ? product(pEsts) : null;
+        const totalGap = diverse.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
+        const { rating, ratingClass } = calculateSlipRating(diverse);
+        const { riskLevel, riskClass } = getRiskLevel(diverse);
+        
+        slips.push({
+          title: `🎃🛡️ Conservative Mix (${diverse.length}-pick: 1G + ${fourRegulars.length}R)`,
+          size: diverse.length,
+          bucket: "Goblin Mix",
+          sortBasis: "Blended",
+          pctWin: pWin ? pct(pWin) : "—",
+          legs: diverse.map(leg => formatLegForDisplay(leg)),
+          totalGap,
+          rating,
+          ratingClass,
+          riskLevel,
+          riskClass,
+          why: `1 ultra-safe goblin mixed with ${fourRegulars.length} top regulars for maximum stability.`
+        });
+      }
+    }
+    
+    // Strategy 3: "Aggressive Mix" - 3 goblins + 2 regulars
+    if (safeGoblins.length >= 3 && safeRegulars.length >= 2) {
+      const threeGoblins = safeGoblins.slice(0, 3);
+      const twoRegulars = [];
+      const usedPlayers = new Set(threeGoblins.map(p => p.player.replace(/\s+\(.+?\)$/, '')));
+      
+      for (const reg of safeRegulars) {
+        const playerKey = reg.player.replace(/\s+\(.+?\)$/, '');
+        if (usedPlayers.has(playerKey)) continue;
+        
+        twoRegulars.push(reg);
+        usedPlayers.add(playerKey);
+        
+        if (twoRegulars.length >= 2) break;
+      }
+      
+      if (twoRegulars.length >= 2) {
+        const diverse = [...threeGoblins, ...twoRegulars];
+        const pEsts = diverse.map(estPEstForRow).filter(Number.isFinite);
+        const pWin = pEsts.length === diverse.length ? product(pEsts) : null;
+        const totalGap = diverse.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
+        const { rating, ratingClass } = calculateSlipRating(diverse);
+        const { riskLevel, riskClass } = getRiskLevel(diverse);
+        
+        slips.push({
+          title: `🎃🔥 Aggressive Mix (${diverse.length}-pick: 3G + ${twoRegulars.length}R)`,
+          size: diverse.length,
+          bucket: "Goblin Mix",
+          sortBasis: "Blended",
+          pctWin: pWin ? pct(pWin) : "—",
+          legs: diverse.map(leg => formatLegForDisplay(leg)),
+          totalGap,
+          rating,
+          ratingClass,
+          riskLevel,
+          riskClass,
+          why: `3 safe goblins combined with ${twoRegulars.length} elite regulars for higher goblin exposure.`
+        });
+      }
+    }
+    
+    return slips;
   }
   
   // Build value hunter slips (high edge but slightly lower hit rates)
