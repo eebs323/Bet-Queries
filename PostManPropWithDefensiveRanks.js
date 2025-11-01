@@ -123,7 +123,7 @@ const CompetitionId = {
             <span class="rating-pill {{ratingClass}}">
               Rating: {{rating}}/10
             </span>
-            <span class="rating-pill">Gap: {{totalGap}}%</span>
+            <span class="rating-pill">Avg Edge: {{avgEdge}}%</span>
             <span class="rating-pill {{riskClass}}">
               Risk: {{riskLevel}}
             </span>
@@ -1069,6 +1069,7 @@ function mapProps(item, filterType) {
     const pEsts = legs.map(estPEstForRow).filter(Number.isFinite);
     const pWin = pEsts.length === legs.length ? product(pEsts) : null;
     const totalGap = legs.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0);
+    const avgEdge = (totalGap / legs.length).toFixed(1);
     const avgScore = legs.reduce((sum, prop) => sum + prop.score, 0) / legs.length;
 
     const { rating, ratingClass } = calculateSlipRating(legs);
@@ -1082,6 +1083,7 @@ function mapProps(item, filterType) {
       legs: legs.map(leg => formatLegForDisplay(leg)),
       pctWin: pWin ? pct(pWin) : "—",
       totalGap: Math.round(totalGap),
+      avgEdge,
       avgScore: (avgScore * 10).toFixed(1),
       rating,
       ratingClass,
@@ -1285,6 +1287,7 @@ function buildRecommendedSlips(rows) {
       const pEsts = safeGoblins.map(estPEstForRow).filter(Number.isFinite);
       const pWin = pEsts.length === safeGoblins.length ? product(pEsts) : null;
       const totalGap = safeGoblins.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
+      const avgEdge = (totalGap / safeGoblins.length).toFixed(1);
       const { rating, ratingClass } = calculateSlipRating(safeGoblins);
       const { riskLevel, riskClass } = getRiskLevel(safeGoblins);
       
@@ -1296,6 +1299,7 @@ function buildRecommendedSlips(rows) {
         pctWin: pWin ? pct(pWin) : "—",
         legs: safeGoblins.map(leg => formatLegForDisplay(leg)),
         totalGap,
+        avgEdge,
         rating,
         ratingClass,
         riskLevel,
@@ -1347,6 +1351,7 @@ function buildRecommendedSlips(rows) {
       pctWin: pWin ? pct(pWin) : "—",
       legs: diverse.map(leg => formatLegForDisplay(leg)),
       totalGap,
+      avgEdge,
       rating,
       ratingClass,
       riskLevel,
@@ -1382,6 +1387,7 @@ function buildRecommendedSlips(rows) {
       const pEsts = sgpLegs.map(estPEstForRow).filter(Number.isFinite);
       const pWin = pEsts.length === sgpLegs.length ? product(pEsts) : null;
       const totalGap = sgpLegs.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
+      const avgEdge = (totalGap / sgpLegs.length).toFixed(1);
       const { rating, ratingClass } = calculateSlipRating(sgpLegs);
       const { riskLevel, riskClass } = getRiskLevel(sgpLegs);
       
@@ -1398,6 +1404,7 @@ function buildRecommendedSlips(rows) {
         pctWin: pWin ? pct(pWin) : "—",
         legs: sgpLegs.map(leg => formatLegForDisplay(leg)),
         totalGap,
+        avgEdge,
         rating,
         ratingClass,
         riskLevel,
@@ -1453,6 +1460,7 @@ function buildRecommendedSlips(rows) {
       const pEsts = portfolio.map(estPEstForRow).filter(Number.isFinite);
       const pWin = pEsts.length === portfolio.length ? product(pEsts) : null;
       const totalGap = portfolio.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
+      const avgEdge = (totalGap / portfolio.length).toFixed(1);
       const { rating, ratingClass } = calculateSlipRating(portfolio);
       const { riskLevel, riskClass } = getRiskLevel(portfolio);
       
@@ -1464,6 +1472,7 @@ function buildRecommendedSlips(rows) {
         pctWin: pWin ? pct(pWin) : "—",
         legs: portfolio.map(leg => formatLegForDisplay(leg)),
         totalGap,
+        avgEdge,
         rating,
         ratingClass,
         riskLevel,
@@ -1510,6 +1519,7 @@ function buildRecommendedSlips(rows) {
     const pEsts = diverse.map(estPEstForRow).filter(Number.isFinite);
     const pWin = pEsts.length === diverse.length ? product(pEsts) : null;
     const totalGap = diverse.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
+    const avgEdge = (totalGap / diverse.length).toFixed(1);
     const { rating, ratingClass } = calculateSlipRating(diverse);
     const { riskLevel, riskClass } = getRiskLevel(diverse);
     const avgImprovement = (diverse.reduce((sum, p) => sum + (p.l5 - p.l10), 0) / diverse.length * 100).toFixed(0);
@@ -1522,6 +1532,7 @@ function buildRecommendedSlips(rows) {
       pctWin: pWin ? pct(pWin) : "—",
       legs: diverse.map(leg => formatLegForDisplay(leg)),
       totalGap,
+      avgEdge,
       rating,
       ratingClass,
       riskLevel,
@@ -1562,6 +1573,7 @@ function buildRecommendedSlips(rows) {
         const pEsts = diverse.map(estPEstForRow).filter(Number.isFinite);
         const pWin = pEsts.length === diverse.length ? product(pEsts) : null;
         const totalGap = diverse.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
+        const avgEdge = (totalGap / diverse.length).toFixed(1);
         const { rating, ratingClass } = calculateSlipRating(diverse);
         const { riskLevel, riskClass } = getRiskLevel(diverse);
         const goblinCount = diverse.filter(p => p._isGoblin).length;
@@ -1575,6 +1587,7 @@ function buildRecommendedSlips(rows) {
           pctWin: pWin ? pct(pWin) : "—",
           legs: diverse.map(leg => formatLegForDisplay(leg)),
           totalGap,
+          avgEdge,
           rating,
           ratingClass,
           riskLevel,
@@ -1608,6 +1621,7 @@ function buildRecommendedSlips(rows) {
         const pEsts = diverse.map(estPEstForRow).filter(Number.isFinite);
         const pWin = pEsts.length === diverse.length ? product(pEsts) : null;
         const totalGap = diverse.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
+        const avgEdge = (totalGap / diverse.length).toFixed(1);
         const { rating, ratingClass } = calculateSlipRating(diverse);
         const { riskLevel, riskClass } = getRiskLevel(diverse);
         
@@ -1619,6 +1633,7 @@ function buildRecommendedSlips(rows) {
           pctWin: pWin ? pct(pWin) : "—",
           legs: diverse.map(leg => formatLegForDisplay(leg)),
           totalGap,
+          avgEdge,
           rating,
           ratingClass,
           riskLevel,
@@ -1649,6 +1664,7 @@ function buildRecommendedSlips(rows) {
         const pEsts = diverse.map(estPEstForRow).filter(Number.isFinite);
         const pWin = pEsts.length === diverse.length ? product(pEsts) : null;
         const totalGap = diverse.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
+        const avgEdge = (totalGap / diverse.length).toFixed(1);
         const { rating, ratingClass } = calculateSlipRating(diverse);
         const { riskLevel, riskClass } = getRiskLevel(diverse);
         
@@ -1660,6 +1676,7 @@ function buildRecommendedSlips(rows) {
           pctWin: pWin ? pct(pWin) : "—",
           legs: diverse.map(leg => formatLegForDisplay(leg)),
           totalGap,
+          avgEdge,
           rating,
           ratingClass,
           riskLevel,
@@ -1734,6 +1751,7 @@ function buildRecommendedSlips(rows) {
         if (riskLevel !== 'LOW' && riskLevel !== 'MEDIUM') continue;
         
         const totalGap = pair.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
+        const avgEdge = (totalGap / 2).toFixed(1);
         const { rating, ratingClass } = calculateSlipRating(pair);
         
         // Calculate parlay odds - use PP_odds or AVG_ODDS
@@ -1759,6 +1777,7 @@ function buildRecommendedSlips(rows) {
           pctWin: pWin ? pct(pWin) : "—",
           legs: pair.map(leg => formatLegForDisplay(leg)),
           totalGap,
+          avgEdge,
           rating,
           ratingClass,
           riskLevel,
@@ -1920,6 +1939,7 @@ function buildRecommendedSlips(rows) {
       pctWin: pWin ? pct(pWin) : "—",
       legs: topElite.map(leg => formatLegForDisplay(leg)),
       totalGap,
+      avgEdge,
       rating,
       ratingClass,
       riskLevel,
@@ -1963,6 +1983,7 @@ function buildRecommendedSlips(rows) {
         const pEsts = hunters.map(estPEstForRow).filter(Number.isFinite);
         const pWin = pEsts.length === hunters.length ? product(pEsts) : null;
         const totalGap = hunters.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
+        const avgEdge = (totalGap / hunters.length).toFixed(1);
         const { rating, ratingClass } = calculateSlipRating(hunters);
         const { riskLevel, riskClass } = getRiskLevel(hunters);
         
@@ -1974,6 +1995,7 @@ function buildRecommendedSlips(rows) {
           pctWin: pWin ? pct(pWin) : "—",
           legs: hunters.map(leg => formatLegForDisplay(leg)),
           totalGap,
+          avgEdge,
           rating,
           ratingClass,
           riskLevel,
