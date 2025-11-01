@@ -577,9 +577,20 @@ const CompetitionId = {
   
   function approvalTagFor(item) {
     const blended = getBlendedStats(item.stats || {});
-    if (isGoblinProp(item.outcome) && isSafeGoblin(blended)) return "✅ Goblin";
-    if (!isGoblinProp(item.outcome) && (isPlayoffs ? isSafeRegularPlayoffs(item) : isSafeRegular(blended))) return "✅ Regular";
-    return "⚠ Trend mismatch";
+    const isGoblin = isGoblinProp(item.outcome);
+    
+    if (isGoblin && isSafeGoblin(blended)) return "✅ Goblin";
+    if (!isGoblin && (isPlayoffs ? isSafeRegularPlayoffs(item) : isSafeRegular(blended))) return "✅ Regular";
+    
+    // Show why it didn't pass
+    if (isGoblin) return "⚠️ Goblin (Low Hit%)";
+    
+    // For regulars, give more detail
+    if (!item.stats?.h2h) return "❌ No H2H Data";
+    if (blended.curSeason < 0.54) return "⚠️ Low Season";
+    if (blended.h2h < 0.66) return "⚠️ Low H2H";
+    
+    return "⚠️ Mixed Trends";
   }
   
 // Helper function to check if a prop is a goblin
@@ -732,19 +743,13 @@ function mapProps(item, filterType) {
     goblinsFound: 0
   };
 
+  // Minimal filter - only removes props with missing data or wrong book
   function filterProps(item, filterType) {
     if (DEBUG_MODE) {
       debugCounters.total++;
-      // Check for goblins early in filtering
-      const ppOddsRaw = item.outcome.bookOdds.PRIZEPICKS?.odds;
-      const ppOdds = parseFloat(ppOddsRaw);
-      const isGoblinTest = isGoblinProp(item.outcome);
-      if (isGoblinTest && debugCounters.total <= 3) {
-        console.log(`\n👿 Goblin detected in filterProps: ${item.outcome.marketLabel}`);
-        console.log(`   PP Odds raw: "${ppOddsRaw}" | parsed: ${ppOdds} | isGoblinProp: ${isGoblinTest}`);
-      }
     }
     
+    // Only filter by book availability
     const isPrizePicks = item.outcome.bookOdds.PRIZEPICKS !== undefined;
     const isSleeper    = item.outcome.bookOdds.SLEEPER   !== undefined;
     if (showPrizePicksOnly && !isPrizePicks) {
@@ -757,8 +762,8 @@ function mapProps(item, filterType) {
       return false;
     }
 
+    // Only filter by Over/Under type if specifically requested
     const outcomeLabel = item.outcome.outcomeLabel;
-    const periodLabel  = item.outcome.periodLabel;
     const isOver  = outcomeLabel === "Over";
     const isUnder = outcomeLabel === "Under";
   
@@ -772,59 +777,21 @@ function mapProps(item, filterType) {
       if (DEBUG_MODE) debugCounters.wrongOverUnder++;
       return false;
     }
-  
-    const blended = getBlendedStats(item.stats || {});
-    const ppOdds        = parseFloat(item.outcome.bookOdds.PRIZEPICKS?.odds);
-    const isGoblin      = isGoblinProp(item.outcome);  // Use the proper goblin detection function
-    const noGoblinProps = !isGoblin;  // Inverse of isGoblin
-    const avgOdds       = getAvgOdds(item);
-  
-    const safeRegular          = noGoblinProps && isSafeRegular(blended);
-    const safeRegularPlayoffs  = noGoblinProps && isSafeRegularPlayoffs(item);
-    const safeGoblin           = isGoblin && isSafeGoblin(blended, avgOdds);
-    const safe2ndHalf          = noGoblinProps && isSafe2ndHalf(blended, periodLabel);
     
-    // Debug goblin safety checks
-    if (DEBUG_MODE && isGoblin) {
-      debugCounters.goblinsFound++;
-      if (debugCounters.goblinsFound <= 5) {
-        console.log(`\n🧟 Goblin #${debugCounters.goblinsFound}: ${item.outcome.marketLabel}`);
-        console.log(`   safeGoblin: ${safeGoblin}`);
-        console.log(`   L20:${blended.l20?.toFixed(2)} L10:${blended.l10?.toFixed(2)} L5:${blended.l5?.toFixed(2)} H2H:${blended.h2h?.toFixed(2)} Season:${blended.curSeason?.toFixed(2)}`);
-      }
+    // Must have basic stats to be useful
+    if (!item.stats || !item.stats.h2h) {
+      if (DEBUG_MODE) debugCounters.failedSafety++;
+      return false;
     }
   
-    let passed = false;
-    if (showOnlyGoblins)      passed = safeGoblin;
-    else if (showOnly2ndHalf) passed = (safeGoblin || safe2ndHalf);
-    else if (isPlayoffs)      passed = (isSafeGoblinPlayoffs && isGoblin) || safeRegularPlayoffs;
-    else                      passed = (safeGoblin || safeRegular);
-    
-    // Debug when safe goblins aren't passing
-    if (DEBUG_MODE && isGoblin && safeGoblin && !passed) {
-      console.log(`⚠️  Safe goblin NOT passing filter: ${item.outcome.marketLabel}`);
-      console.log(`   showOnlyGoblins: ${showOnlyGoblins}, showOnly2ndHalf: ${showOnly2ndHalf}, isPlayoffs: ${isPlayoffs}`);
-      console.log(`   safeGoblin: ${safeGoblin}, safeRegular: ${safeRegular}`);
-    }
-    
     if (DEBUG_MODE) {
-      if (passed) {
-        debugCounters.passed++;
-        // Show first 3 regular passes, but ALWAYS show goblin passes
-        if (debugCounters.passed <= 3 || (isGoblin && debugCounters.passed <= 10)) {
-          console.log(`✅ Passed: ${item.outcome.marketLabel} | isGoblin:${isGoblin} | safeRegular:${safeRegular} | safeGoblin:${safeGoblin}`);
-          console.log(`   Stats: L5:${blended.l5?.toFixed(2)} L10:${blended.l10?.toFixed(2)} H2H:${blended.h2h?.toFixed(2)} Season:${blended.curSeason?.toFixed(2)}`);
-        }
-      } else {
-        debugCounters.failedSafety++;
-        if (debugCounters.failedSafety <= 3) {
-          console.log(`❌ Failed safety: ${item.outcome.marketLabel} | isGoblin:${isGoblin} | safeRegular:${safeRegular} | safeGoblin:${safeGoblin}`);
-          console.log(`   Stats: L5:${blended.l5?.toFixed(2)} L10:${blended.l10?.toFixed(2)} H2H:${blended.h2h?.toFixed(2)} Season:${blended.curSeason?.toFixed(2)}`);
-        }
+      debugCounters.passed++;
+      if (debugCounters.passed <= 3) {
+        console.log(`✅ Passed basic filter: ${item.outcome.marketLabel}`);
       }
     }
     
-    return passed;
+    return true;
   }
   
   // Print debug summary at the end
@@ -892,9 +859,15 @@ function mapProps(item, filterType) {
   }
   
   function buildAllRegularPairs(rows) {
-    const regularsPos = rows.filter(r => 
-        !r._isGoblin && typeof r.edgeGapPct === "number" && r.edgeGapPct > 0
-    );
+    // Filter for regular props that meet safety criteria
+    const regularsPos = rows.filter(r => {
+        if (r._isGoblin) return false; // Skip goblins
+        if (!r.edgeGapPct || r.edgeGapPct <= 0) return false; // Must have positive edge
+        
+        // Apply safety filter here instead of in filterProps
+        const stats = getBlendedStats({ l20: r.l20, l10: r.l10, l5: r.l5, h2h: r.h2h, curSeason: r.curSeason, prevSeason: r.prevSeason });
+        return isPlayoffs ? isSafeRegularPlayoffs(r) : isSafeRegular(stats);
+    });
   
     // Unique by player first
     const uniq = uniqueByPlayer(regularsPos);
@@ -1003,6 +976,11 @@ function mapProps(item, filterType) {
       // Must have H2H data and positive edge gap
       if (!prop.h2h || !prop.edgeGapPct || prop.edgeGapPct <= 0) return -1;
       
+      // Must pass safety check for mega slip
+      const stats = getBlendedStats({ l20: prop.l20, l10: prop.l10, l5: prop.l5, h2h: prop.h2h, curSeason: prop.curSeason, prevSeason: prop.prevSeason });
+      const passesRegularSafety = isPlayoffs ? isSafeRegularPlayoffs(prop) : isSafeRegular(stats);
+      if (!passesRegularSafety) return -1;
+      
       let score = 0;
       
       // Core stats weighted scoring (total 100%)
@@ -1029,9 +1007,9 @@ function mapProps(item, filterType) {
 
     // Score and filter props
     const scoredProps = uniqueByPlayer(
-      rows.filter(r => r.approvalTag === "✅ Regular")  // Only safe regulars
+      rows.filter(r => !r._isGoblin)  // No goblins in mega slip
           .map(r => ({ ...r, score: calculateScore(r) }))
-          .filter(r => r.score > 0)  // Must have valid score
+          .filter(r => r.score > 0)  // Must have valid score (which includes safety check)
           .sort((a, b) => {
             // Primary sort by weighted score
             if (b.score !== a.score) return b.score - a.score;
@@ -1261,10 +1239,13 @@ function buildRecommendedSlips(rows) {
   
     // Mixed Trio (3-pick): top 2 Safe Goblins + best Regular
     const top2Goblins = topByGap(safeGoblins, 2);
-    // Get regulars (non-goblins) with positive edge gaps
-    const regulars = rows.filter(r => 
-        !r._isGoblin && typeof r.edgeGapPct === "number" && r.edgeGapPct > 0
-    );
+    // Get regulars (non-goblins) with positive edge gaps that pass safety
+    const regulars = rows.filter(r => {
+        if (r._isGoblin) return false;
+        if (!r.edgeGapPct || r.edgeGapPct <= 0) return false;
+        const stats = getBlendedStats({ l20: r.l20, l10: r.l10, l5: r.l5, h2h: r.h2h, curSeason: r.curSeason, prevSeason: r.prevSeason });
+        return isPlayoffs ? isSafeRegularPlayoffs(r) : isSafeRegular(stats);
+    });
     const reg1 = topByGap(regulars, 1);
     if (top2Goblins.length === 2 && reg1.length === 1) {
       const trio = uniqueByPlayer([...top2Goblins, ...reg1]).slice(0,3);
