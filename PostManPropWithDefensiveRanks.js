@@ -1280,7 +1280,11 @@ function buildRecommendedSlips(rows) {
     const mega = buildMegaSlip(rows);
     if (mega) slips.push(mega);
   
-    // 6. VALUE HUNTERS: High edge but slightly lower hit rates (3-4 picks)
+    // 6. TRENDING UP: All props with improving form (L5 > L10)
+    const trendingSlip = buildTrendingUpSlip(safeRegulars);
+    if (trendingSlip) slips.push(trendingSlip);
+  
+    // 7. VALUE HUNTERS: High edge but slightly lower hit rates (3-4 picks)
     const valueSlips = buildValueHunterSlips(rows);
     slips.push(...valueSlips);
   
@@ -1453,6 +1457,61 @@ function buildRecommendedSlips(rows) {
     }
     
     return slips;
+  }
+  
+  // Build trending up slip (all props with improving form)
+  function buildTrendingUpSlip(safeRegulars) {
+    // Filter for props trending up (L5 > L10 * 1.1 = significant improvement)
+    const trendingUp = safeRegulars.filter(r => {
+      const l5 = Number(r.l5) || 0;
+      const l10 = Number(r.l10) || 0;
+      return l5 > l10 * 1.1; // At least 10% improvement
+    }).sort((a, b) => {
+      // Sort by improvement magnitude and edge
+      const improvementA = (a.l5 - a.l10) + (a.edgeGapPct / 100);
+      const improvementB = (b.l5 - b.l10) + (b.edgeGapPct / 100);
+      return improvementB - improvementA;
+    });
+    
+    if (trendingUp.length < 4) return null;
+    
+    // Take top 5-6 trending props with diversity
+    const diverse = [];
+    const usedPlayers = new Set();
+    
+    for (const prop of trendingUp) {
+      const playerKey = prop.player.replace(/\s+\(.+?\)$/,'');
+      if (usedPlayers.has(playerKey)) continue;
+      
+      diverse.push(prop);
+      usedPlayers.add(playerKey);
+      
+      if (diverse.length >= 6) break;
+    }
+    
+    if (diverse.length < 4) return null;
+    
+    const pEsts = diverse.map(estPEstForRow).filter(Number.isFinite);
+    const pWin = pEsts.length === diverse.length ? product(pEsts) : null;
+    const totalGap = diverse.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
+    const { rating, ratingClass } = calculateSlipRating(diverse);
+    const { riskLevel, riskClass } = getRiskLevel(diverse);
+    const avgImprovement = (diverse.reduce((sum, p) => sum + (p.l5 - p.l10), 0) / diverse.length * 100).toFixed(0);
+    
+    return {
+      title: `📈 Trending Up (${diverse.length}-pick)`,
+      size: diverse.length,
+      bucket: "Trending",
+      sortBasis: "Improvement",
+      pctWin: pWin ? pct(pWin) : "—",
+      legs: diverse.map(leg => formatLegForDisplay(leg)),
+      totalGap,
+      rating,
+      ratingClass,
+      riskLevel,
+      riskClass,
+      why: `All props showing upward momentum (avg +${avgImprovement}% L5 vs L10 improvement).`
+    };
   }
   
   // Build value hunter slips (high edge but slightly lower hit rates)
