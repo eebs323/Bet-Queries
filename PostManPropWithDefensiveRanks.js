@@ -671,6 +671,7 @@ function mapProps(item, filterType) {
     const periodLabel  = outcome.periodLabel || "Full";
     const approvalTag  = approvalTagFor(item);
     const avgOdds = getAvgOdds(item);
+    const hasOdds = hasRealOdds(item);
     const edgeNote = edgeNoteFor(outcome, raw || {}, avgOdds);
     const edgeGapPct = edgeGapFor(outcome, raw || {}, avgOdds); // numeric for sorting/slips
   
@@ -701,12 +702,13 @@ function mapProps(item, filterType) {
       PP_odds:      outcome.bookOdds.PRIZEPICKS?.odds,
       UD_odds:      outcome.bookOdds.UNDERDOG?.odds,
       SleeperOdds:  outcome.bookOdds.SLEEPER?.odds,
-      AVG_ODDS:     avgOdds,
+      AVG_ODDS:     hasOdds ? avgOdds : `${avgOdds}*`,
   
       // hidden helpers for mixing/diversity
       _teamId: outcome.teamId,
       _isOver: isOver ? 1 : 0,
       _isGoblin: isGoblin,  // Store goblin status for slip building
+      _hasRealOdds: hasOdds,  // Track if we have real odds or not (for display purposes)
       
       // Keep a reference to stats and outcome for slip building
       stats: raw,
@@ -729,6 +731,18 @@ function mapProps(item, filterType) {
     } else {
       return -120; // Default to -120 odds when no valid odds are available
     }
+  }
+  
+  // Check if we have real sportsbook odds (not PrizePicks/Underdog only)
+  function hasRealOdds(item) {
+    const sportsbookOdds = [
+      item.outcome.bookOdds?.CAESARS?.odds,
+      item.outcome.bookOdds?.FANDUEL?.odds,
+      item.outcome.bookOdds?.DRAFTKINGS?.odds,
+      item.outcome.bookOdds?.BET365?.odds,
+      item.outcome.bookOdds?.BETMGM?.odds
+    ].map(odds => parseFloat(odds)).filter(odds => !isNaN(odds));
+    return sportsbookOdds.length > 0;
   }
   
   // ---------- Filters ----------
@@ -1079,47 +1093,56 @@ function mapProps(item, filterType) {
   }
   
   function calculateSlipRating(legs) {
-    let score = 0;
+    let totalScore = 0;
+    
     for (const leg of legs) {
-        // Get base stats
+        // Get base stats (all on 0-1 scale)
         const h2h = Number(leg.h2h) || 0;
         const l5 = Number(leg.l5) || 0;
         const l10 = Number(leg.l10) || 0;
+        const curSeason = Number(leg.curSeason) || 0;
         const prevSeason = Number(leg.prevSeason) || 0;
-        const edgeGap = leg.edgeGapPct || 0;
+        
+        // Normalize edge gap to 0-1 scale (assume max useful edge is 100%)
+        const edgeGap = Math.min(100, Math.max(0, leg.edgeGapPct || 0)) / 100;
+        
+        // Normalize defense rank to 0-1 scale (1 = best, 30 = worst)
         const defRank = Number(leg.defenseRank);
+        const defScore = (defRank && defRank > 0) ? Math.max(0, (30 - defRank) / 30) : 0;
+        
+        let legScore = 0;
         
         if (isEarlySeason) {
             // Early season weighting
-            score += h2h * 0.35;           // H2H (35%) - most reliable early
-            score += l5 * 0.25;            // L5 (25%) - recent form
-            score += prevSeason * 0.20;     // Last season (20%) - historical baseline
-            score += edgeGap * 0.15;        // Edge gap (15%)
-            if (defRank && defRank <= 10) score += 0.05;  // Defense (5%)
-            
-            // Early season bonus for improvement
-            const improvement = l5 - prevSeason;
-            if (improvement > 0.1) score += 0.1;
+            legScore += h2h * 0.30;           // H2H (30%) - most reliable early
+            legScore += l5 * 0.25;            // L5 (25%) - recent form
+            legScore += prevSeason * 0.20;    // Last season (20%) - historical baseline
+            legScore += edgeGap * 0.20;       // Edge gap (20%)
+            legScore += defScore * 0.05;      // Defense (5%)
         } else {
             // Regular season weighting
-            score += h2h * 0.25;           // H2H (25%)
-            score += l5 * 0.20;            // L5 (20%)
-            score += l10 * 0.15;           // L10 (15%)
-            score += edgeGap * 0.25;       // Edge gap (25%)
-            if (defRank && defRank <= 10) score += 0.15;  // Defense (15%)
+            legScore += h2h * 0.25;           // H2H (25%)
+            legScore += l5 * 0.20;            // L5 (20%)
+            legScore += l10 * 0.15;           // L10 (15%)
+            legScore += curSeason * 0.10;     // Season (10%)
+            legScore += edgeGap * 0.20;       // Edge gap (20%)
+            legScore += defScore * 0.10;      // Defense (10%)
         }
+        
+        totalScore += legScore;
     }
     
-    // Average per leg and convert to 0-10 scale
-    const rating = Math.round((score / legs.length) * 10);
+    // Average per leg (0-1 scale) and convert to 0-10 scale
+    const avgScore = totalScore / legs.length;
+    const rating = Math.round(avgScore * 10 * 10) / 10; // Round to 1 decimal
     
-    // Generate rating class - stricter thresholds for early season
+    // Generate rating class
     let ratingClass = 'low';
     if (isEarlySeason) {
-        if (rating >= 8) ratingClass = 'high';       // More demanding early season
+        if (rating >= 8) ratingClass = 'high';
         else if (rating >= 6) ratingClass = 'medium';
     } else {
-        if (rating >= 7) ratingClass = 'high';       // Regular season thresholds
+        if (rating >= 7) ratingClass = 'high';
         else if (rating >= 5) ratingClass = 'medium';
     }
     
@@ -1194,7 +1217,7 @@ function buildRecommendedSlips(rows) {
     const safeGoblins = rows.filter(r => {
         const isGoblin = r._isGoblin;
         if (!isGoblin) return false;
-        if (r.edgeGapPct <= 0) return false;
+        if (!r.edgeGapPct || r.edgeGapPct <= 0) return false;
         const stats = getBlendedStats(r.stats || {});
         return isPlayoffs ? isSafeGoblinPlayoffs(r) : isSafeGoblin(stats);
     }).sort((a, b) => b.edgeGapPct - a.edgeGapPct);
