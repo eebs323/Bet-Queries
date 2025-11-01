@@ -1063,6 +1063,9 @@ function mapProps(item, filterType) {
 
     return {
       title: `🎯 Mega ${legs.length}-Pick Slip`,
+      size: legs.length,
+      bucket: "Mega",
+      sortBasis: "Weighted Score",
       legs: legs.map(leg => formatLegForDisplay(leg)),
       pctWin: pWin ? pct(pWin) : "—",
       totalGap: Math.round(totalGap),
@@ -1189,31 +1192,29 @@ function buildRecommendedSlips(rows) {
   
     // Get all safe goblins with positive edge gaps, sorted by gap value
     const safeGoblins = rows.filter(r => {
-        // First check if it's a goblin prop (using the stored flag)
         const isGoblin = r._isGoblin;
-        if (DEBUG_MODE && isGoblin) {
-            console.log(`\n🔍 Goblin found in buildRecommendedSlips: ${r.player}`);
-            console.log(`   Edge gap: ${r.edgeGapPct}`);
-            console.log(`   Stats: L20:${r.l20} L10:${r.l10} L5:${r.l5} curSeason:${r.curSeason} H2H:${r.h2h}`);
-            const stats = getBlendedStats(r.stats || {});
-            console.log(`   isSafeGoblin: ${isSafeGoblin(stats)}`);
-        }
-        
         if (!isGoblin) return false;
-        // Then check if it has a valid positive edge gap
         if (r.edgeGapPct <= 0) return false;
-        // Finally check if it passes safety criteria
         const stats = getBlendedStats(r.stats || {});
         return isPlayoffs ? isSafeGoblinPlayoffs(r) : isSafeGoblin(stats);
     }).sort((a, b) => b.edgeGapPct - a.edgeGapPct);
     
+    // Get all safe regulars with positive edge gaps
+    const safeRegulars = rows.filter(r => {
+        if (r._isGoblin) return false;
+        if (!r.edgeGapPct || r.edgeGapPct <= 0) return false;
+        const stats = getBlendedStats({ l20: r.l20, l10: r.l10, l5: r.l5, h2h: r.h2h, curSeason: r.curSeason, prevSeason: r.prevSeason });
+        return isPlayoffs ? isSafeRegularPlayoffs(r) : isSafeRegular(stats);
+    }).sort((a, b) => b.edgeGapPct - a.edgeGapPct);
+    
     if (DEBUG_MODE) {
-        console.log(`\n🎰 Goblin Slip Debug:`);
-        console.log(`   Total rows passed to buildRecommendedSlips: ${rows.length}`);
-        console.log(`   Safe goblins found: ${safeGoblins.length}`);
+        console.log(`\n🎰 Slip Building Debug:`);
+        console.log(`   Total rows: ${rows.length}`);
+        console.log(`   Safe goblins: ${safeGoblins.length}`);
+        console.log(`   Safe regulars: ${safeRegulars.length}`);
     }
 
-    // If we have any safe goblins, create a single slip with all of them
+    // 1. GOBLIN SLIP: All safe goblins in one slip
     if (safeGoblins.length > 0) {
       const pEsts = safeGoblins.map(estPEstForRow).filter(Number.isFinite);
       const pWin = pEsts.length === safeGoblins.length ? product(pEsts) : null;
@@ -1222,7 +1223,7 @@ function buildRecommendedSlips(rows) {
       const { riskLevel, riskClass } = getRiskLevel(safeGoblins);
       
       slips.push({
-        title: `Safe Goblins (${safeGoblins.length}-pick)`,
+        title: `🎃 Safe Goblins (${safeGoblins.length}-pick)`,
         size: safeGoblins.length,
         bucket: "Goblin",
         sortBasis: "Edge Gap",
@@ -1233,54 +1234,259 @@ function buildRecommendedSlips(rows) {
         ratingClass,
         riskLevel,
         riskClass,
-        why: "All qualifying Goblins with positive Edge Gaps that pass strict hit-rate filters. For playoffs: L5≥0.6 and H2H≥0.9. For regular season: L20/L10/L5/CurSeason≥0.7 and H2H≥0.7."
+        why: "All qualifying Goblins with positive Edge Gaps that pass strict hit-rate filters."
       });
     }
   
-    // Mixed Trio (3-pick): top 2 Safe Goblins + best Regular
-    const top2Goblins = topByGap(safeGoblins, 2);
-    // Get regulars (non-goblins) with positive edge gaps that pass safety
-    const regulars = rows.filter(r => {
-        if (r._isGoblin) return false;
-        if (!r.edgeGapPct || r.edgeGapPct <= 0) return false;
-        const stats = getBlendedStats({ l20: r.l20, l10: r.l10, l5: r.l5, h2h: r.h2h, curSeason: r.curSeason, prevSeason: r.prevSeason });
-        return isPlayoffs ? isSafeRegularPlayoffs(r) : isSafeRegular(stats);
+    // 2. ELITE TIER: Top 10% by edge (4-6 picks)
+    const eliteCount = Math.min(6, Math.max(4, Math.floor(safeRegulars.length * 0.1)));
+    if (safeRegulars.length >= 4) {
+      const eliteSlip = buildTieredSlip(safeRegulars.slice(0, eliteCount), "Elite", "🏆");
+      if (eliteSlip) slips.push(eliteSlip);
+    }
+  
+    // 3. SAME GAME PARLAYS: Group by event/team for correlation
+    const sameGameSlips = buildSameGameParlays(safeRegulars);
+    slips.push(...sameGameSlips);
+  
+    // 4. BALANCED PORTFOLIOS: Mix edge tiers with risk management (3-5 picks each)
+    const portfolioSlips = buildBalancedPortfolios(safeRegulars);
+    slips.push(...portfolioSlips);
+  
+    // 5. MEGA SLIP: Best overall combination (6→5→4→3)
+    const mega = buildMegaSlip(rows);
+    if (mega) slips.push(mega);
+  
+    // 6. VALUE HUNTERS: High edge but slightly lower hit rates (3-4 picks)
+    const valueSlips = buildValueHunterSlips(rows);
+    slips.push(...valueSlips);
+  
+    return slips;
+  }
+  
+  // Build a tiered slip from a sorted list
+  function buildTieredSlip(props, tierName, emoji) {
+    if (props.length < 3) return null;
+    
+    // Ensure diversity
+    const diverse = [];
+    const usedTeams = new Set();
+    const usedPlayers = new Set();
+    
+    for (const prop of props) {
+      const playerKey = prop.player.replace(/\s+\(.+?\)$/,'');
+      if (usedPlayers.has(playerKey)) continue;
+      
+      // Prefer different teams when possible
+      if (diverse.length < 3 || !usedTeams.has(prop._teamId)) {
+        diverse.push(prop);
+        usedTeams.add(prop._teamId);
+        usedPlayers.add(playerKey);
+      }
+      
+      if (diverse.length >= 6) break;
+    }
+    
+    if (diverse.length < 3) return null;
+    
+    const pEsts = diverse.map(estPEstForRow).filter(Number.isFinite);
+    const pWin = pEsts.length === diverse.length ? product(pEsts) : null;
+    const totalGap = diverse.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
+    const { rating, ratingClass } = calculateSlipRating(diverse);
+    const { riskLevel, riskClass } = getRiskLevel(diverse);
+    const avgEdge = (totalGap / diverse.length).toFixed(1);
+    
+    return {
+      title: `${emoji} ${tierName} Tier (${diverse.length}-pick)`,
+      size: diverse.length,
+      bucket: tierName,
+      sortBasis: "Edge Gap",
+      pctWin: pWin ? pct(pWin) : "—",
+      legs: diverse.map(leg => formatLegForDisplay(leg)),
+      totalGap,
+      rating,
+      ratingClass,
+      riskLevel,
+      riskClass,
+      why: `Top ${tierName.toLowerCase()} props averaging ${avgEdge}% edge with diverse team coverage.`
+    };
+  }
+  
+  // Build same-game parlays (SGPs) for correlation
+  function buildSameGameParlays(safeRegulars) {
+    const slips = [];
+    const byEvent = new Map();
+    
+    // Group props by event (game)
+    safeRegulars.forEach(prop => {
+      const eventId = prop.outcome?.eventId;
+      if (!eventId) return;
+      if (!byEvent.has(eventId)) byEvent.set(eventId, []);
+      byEvent.get(eventId).push(prop);
     });
-    const reg1 = topByGap(regulars, 1);
-    if (top2Goblins.length === 2 && reg1.length === 1) {
-      const trio = uniqueByPlayer([...top2Goblins, ...reg1]).slice(0,3);
-      if (trio.length === 3) {
-        const pEsts = trio.map(estPEstForRow).filter(Number.isFinite);
-        const pWin = pEsts.length===3 ? product(pEsts) : null;
-        const totalGap = trio.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
-        const { rating, ratingClass } = calculateSlipRating(trio);
-        const { riskLevel, riskClass } = getRiskLevel(trio);
+    
+    // Create SGPs for games with 3+ props
+    let sgpCount = 0;
+    for (const [eventId, props] of byEvent.entries()) {
+      if (props.length < 3 || sgpCount >= 5) continue; // Max 5 SGPs
+      
+      // Sort by edge gap and take top 3-5
+      const sorted = props.sort((a, b) => b.edgeGapPct - a.edgeGapPct);
+      const sgpLegs = uniqueByPlayer(sorted).slice(0, Math.min(5, sorted.length));
+      
+      if (sgpLegs.length < 3) continue;
+      
+      const pEsts = sgpLegs.map(estPEstForRow).filter(Number.isFinite);
+      const pWin = pEsts.length === sgpLegs.length ? product(pEsts) : null;
+      const totalGap = sgpLegs.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
+      const { rating, ratingClass } = calculateSlipRating(sgpLegs);
+      const { riskLevel, riskClass } = getRiskLevel(sgpLegs);
+      
+      // Get game info from first prop
+      const firstProp = sgpLegs[0];
+      const teams = firstProp.player.split(" vs ");
+      const gameLabel = teams.length > 1 ? teams[1] : "Same Game";
+      
+      slips.push({
+        title: `🎯 SGP: ${gameLabel} (${sgpLegs.length}-pick)`,
+        size: sgpLegs.length,
+        bucket: "SGP",
+        sortBasis: "Correlation",
+        pctWin: pWin ? pct(pWin) : "—",
+        legs: sgpLegs.map(leg => formatLegForDisplay(leg)),
+        totalGap,
+        rating,
+        ratingClass,
+        riskLevel,
+        riskClass,
+        why: `Same-game parlay with correlated props for increased likelihood.`
+      });
+      
+      sgpCount++;
+    }
+    
+    return slips;
+  }
+  
+  // Build balanced portfolios mixing edge quality and risk
+  function buildBalancedPortfolios(safeRegulars) {
+    if (safeRegulars.length < 12) return []; // Need enough props for multiple portfolios
+    
+    const slips = [];
+    const portfolioCount = Math.min(3, Math.floor(safeRegulars.length / 12)); // Max 3 portfolios
+    
+    for (let i = 0; i < portfolioCount; i++) {
+      // Take alternating props from different parts of the sorted list
+      // This mixes high-edge with medium-edge for balance
+      const portfolio = [];
+      const startIdx = i * 4; // Offset each portfolio
+      
+      // High edge (from top third)
+      const topThird = Math.floor(safeRegulars.length / 3);
+      portfolio.push(safeRegulars[startIdx % topThird]);
+      portfolio.push(safeRegulars[(startIdx + 1) % topThird]);
+      
+      // Medium edge (from middle third)
+      const midStart = topThird;
+      portfolio.push(safeRegulars[midStart + (startIdx % topThird)]);
+      
+      // Add 1-2 more diverse picks
+      for (let j = startIdx + 2; j < safeRegulars.length && portfolio.length < 5; j++) {
+        const candidate = safeRegulars[j];
+        // Avoid same player/team as existing picks
+        const playerKey = candidate.player.replace(/\s+\(.+?\)$/,'');
+        const hasSamePlayer = portfolio.some(p => 
+          p.player.replace(/\s+\(.+?\)$/,'') === playerKey
+        );
+        const hasSameTeam = portfolio.some(p => p._teamId === candidate._teamId);
+        
+        if (!hasSamePlayer && !hasSameTeam) {
+          portfolio.push(candidate);
+        }
+      }
+      
+      if (portfolio.length < 3) continue;
+      
+      const pEsts = portfolio.map(estPEstForRow).filter(Number.isFinite);
+      const pWin = pEsts.length === portfolio.length ? product(pEsts) : null;
+      const totalGap = portfolio.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
+      const { rating, ratingClass } = calculateSlipRating(portfolio);
+      const { riskLevel, riskClass } = getRiskLevel(portfolio);
+      
+      slips.push({
+        title: `⚖️ Balanced Portfolio ${i + 1} (${portfolio.length}-pick)`,
+        size: portfolio.length,
+        bucket: "Balanced",
+        sortBasis: "Risk-Adjusted",
+        pctWin: pWin ? pct(pWin) : "—",
+        legs: portfolio.map(leg => formatLegForDisplay(leg)),
+        totalGap,
+        rating,
+        ratingClass,
+        riskLevel,
+        riskClass,
+        why: `Balanced mix of high and medium edge props with diverse team exposure.`
+      });
+    }
+    
+    return slips;
+  }
+  
+  // Build value hunter slips (high edge but slightly lower hit rates)
+  function buildValueHunterSlips(rows) {
+    // Props with good edge but don't quite pass strict safety filters
+    const valueProps = rows.filter(r => {
+      if (r._isGoblin) return false;
+      if (!r.edgeGapPct || r.edgeGapPct < 10) return false; // Must have 10%+ edge
+      
+      // Check if it would fail strict safety but has good edge
+      const stats = getBlendedStats({ l20: r.l20, l10: r.l10, l5: r.l5, h2h: r.h2h, curSeason: r.curSeason, prevSeason: r.prevSeason });
+      const passesStrict = isPlayoffs ? isSafeRegularPlayoffs(r) : isSafeRegular(stats);
+      
+      if (passesStrict) return false; // Already in other slips
+      
+      // Relaxed criteria: good recent form OR good H2H
+      const hasGoodRecent = (stats.l5 >= 0.6 && stats.l10 >= 0.5);
+      const hasGoodH2H = (stats.h2h >= 0.7);
+      const hasDecentSeason = (stats.curSeason >= 0.5);
+      
+      return (hasGoodRecent || hasGoodH2H) && hasDecentSeason;
+    }).sort((a, b) => b.edgeGapPct - a.edgeGapPct);
+    
+    const slips = [];
+    if (valueProps.length >= 3) {
+      // Create 1-2 value hunter slips
+      const slipCount = Math.min(2, Math.floor(valueProps.length / 3));
+      
+      for (let i = 0; i < slipCount; i++) {
+        const start = i * 3;
+        const hunters = uniqueByPlayer(valueProps.slice(start, start + 4));
+        
+        if (hunters.length < 3) continue;
+        
+        const pEsts = hunters.map(estPEstForRow).filter(Number.isFinite);
+        const pWin = pEsts.length === hunters.length ? product(pEsts) : null;
+        const totalGap = hunters.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
+        const { rating, ratingClass } = calculateSlipRating(hunters);
+        const { riskLevel, riskClass } = getRiskLevel(hunters);
         
         slips.push({
-          title: "Mixed Trio (3-pick)",
-          size: 3,
-          bucket: "Mixed",
-          sortBasis: "Edge Gap",
+          title: `💎 Value Hunters ${i + 1} (${hunters.length}-pick)`,
+          size: hunters.length,
+          bucket: "Value",
+          sortBasis: "High Edge",
           pctWin: pWin ? pct(pWin) : "—",
-          legs: trio.map(leg => formatLegForDisplay(leg)),
+          legs: hunters.map(leg => formatLegForDisplay(leg)),
           totalGap,
           rating,
           ratingClass,
           riskLevel,
           riskClass,
-          why: "Blend of two high-edge Goblins plus the top Regular to diversify risk across props."
+          why: `High edge props (${(totalGap/hunters.length).toFixed(1)}% avg) with acceptable risk profiles.`
         });
       }
     }
-  
-    // NEW: ALL Regular Value (2-pick) slips with favorable mix among positive gaps
-    const allRegPairs = buildAllRegularPairs(rows);
-    slips.push(...allRegPairs);
-  
-    // NEW: Mega Slip (6→5→4→3)
-    const mega = buildMegaSlip(rows);
-    if (mega) slips.push(mega);
-  
+    
     return slips;
   }
   
