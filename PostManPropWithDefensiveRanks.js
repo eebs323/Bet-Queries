@@ -1293,25 +1293,30 @@ function buildRecommendedSlips(rows) {
     const twoManParlays = build2ManParlays(safeRegulars);
     slips.push(...twoManParlays);
   
-    // 10. ALL GOBLINS SLIP: All safe goblins in one slip (moved to end)
-    if (safeGoblins.length > 0) {
-      const pEsts = safeGoblins.map(estPEstForRow).filter(Number.isFinite);
-      const pWin = pEsts.length === safeGoblins.length ? product(pEsts) : null;
-      const totalGap = safeGoblins.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
-      const avgEdge = (totalGap / safeGoblins.length).toFixed(1);
-      const { rating, ratingClass } = calculateSlipRating(safeGoblins);
-      const { riskLevel, riskClass } = getRiskLevel(safeGoblins);
+    // 10. ALL ELITE GOBLINS SLIP: All safe elite starter goblins in one slip (moved to end)
+    const eliteGoblinsForSlip = filterEliteGoblins(safeGoblins);
+    if (eliteGoblinsForSlip.length > 0) {
+      const pEsts = eliteGoblinsForSlip.map(estPEstForRow).filter(Number.isFinite);
+      const pWin = pEsts.length === eliteGoblinsForSlip.length ? product(pEsts) : null;
+      const totalGap = eliteGoblinsForSlip.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
+      const avgEdge = (totalGap / eliteGoblinsForSlip.length).toFixed(1);
+      const { rating, ratingClass } = calculateSlipRating(eliteGoblinsForSlip);
+      const { riskLevel, riskClass } = getRiskLevel(eliteGoblinsForSlip);
       
-      const avgOdds = calculateAvgOdds(safeGoblins);
-      const parlayOdds = calculateParlayOdds(safeGoblins);
+      const avgOdds = calculateAvgOdds(eliteGoblinsForSlip);
+      const parlayOdds = calculateParlayOdds(eliteGoblinsForSlip);
+      
+      if (DEBUG_MODE) {
+        console.log(`🎃 All Goblins Slip: Filtered ${safeGoblins.length} total goblins to ${eliteGoblinsForSlip.length} elite starter goblins`);
+      }
       
       slips.push({
-        title: `🎃 Safe Goblins (${safeGoblins.length}-pick)`,
-        size: safeGoblins.length,
+        title: `🎃 Elite Goblins (${eliteGoblinsForSlip.length}-pick)`,
+        size: eliteGoblinsForSlip.length,
         bucket: "Goblin",
         sortBasis: "Edge Gap",
         pctWin: pWin ? pct(pWin) : "—",
-        legs: safeGoblins.map(leg => formatLegForDisplay(leg)),
+        legs: eliteGoblinsForSlip.map(leg => formatLegForDisplay(leg)),
         totalGap,
         avgEdge,
         rating,
@@ -1320,7 +1325,7 @@ function buildRecommendedSlips(rows) {
         riskClass,
         avgOdds,
         parlayOdds,
-        why: "All qualifying Goblins with positive Edge Gaps that pass strict hit-rate filters."
+        why: "All qualifying elite starter Goblins with positive Edge Gaps that pass strict hit-rate filters."
       });
     }
   
@@ -1593,28 +1598,8 @@ function buildRecommendedSlips(rows) {
   function buildGoblinMixSlips(safeGoblins, safeRegulars) {
     if (safeGoblins.length < 2 || safeRegulars.length < 2) return [];
     
-    // Load elite starters and filter goblins to only include elite starter goblins
-    const eliteStarters = loadEliteStarters();
-    const eliteNames = new Set(
-      eliteStarters.map(p => p.player.toLowerCase().trim())
-    );
-    
-    // Filter goblins to only those from elite starters
-    const eliteGoblins = safeGoblins.filter(goblin => {
-      // Extract player name from the display string
-      const playerMatch = goblin.player.match(/\[(?:Over|Under)\]\s+(.+?)\s+-\s+/);
-      if (!playerMatch) return false;
-      
-      const playerName = playerMatch[1].toLowerCase().trim();
-      
-      // Check if this player is in elite list (fuzzy match for partial names)
-      for (const eliteName of eliteNames) {
-        if (playerName.includes(eliteName) || eliteName.includes(playerName)) {
-          return true;
-        }
-      }
-      return false;
-    });
+    // Filter goblins to only include elite starter goblins using helper function
+    const eliteGoblins = filterEliteGoblins(safeGoblins);
     
     if (DEBUG_MODE) {
       console.log(`🎃 Goblin Mix: Filtered ${safeGoblins.length} total goblins to ${eliteGoblins.length} elite starter goblins`);
@@ -1626,8 +1611,8 @@ function buildRecommendedSlips(rows) {
     const slips = [];
     
     // Strategy 1: "Goblin Boost" - 2 safest elite goblins + 3 elite regulars
-    if (safeGoblins.length >= 2 && safeRegulars.length >= 3) {
-      const topGoblins = safeGoblins.slice(0, 2); // Already sorted by safety
+    if (eliteGoblins.length >= 2 && safeRegulars.length >= 3) {
+      const topGoblins = eliteGoblins.slice(0, 2); // Already sorted by safety
       const topRegulars = safeRegulars.slice(0, 5);
       
       // Ensure diversity
@@ -1677,12 +1662,12 @@ function buildRecommendedSlips(rows) {
       }
     }
     
-    // Strategy 2: "Conservative Mix" - 1 goblin + 4 regulars
-    if (safeGoblins.length >= 1 && safeRegulars.length >= 4) {
-      const oneGoblin = [safeGoblins[0]]; // Safest goblin
+    // Strategy 2: "Conservative Mix" - 1 elite goblin + 4 regulars
+    if (eliteGoblins.length >= 1 && safeRegulars.length >= 4) {
+      const oneGoblin = [eliteGoblins[0]]; // Safest elite goblin
       const fourRegulars = [];
-      const usedPlayers = new Set([safeGoblins[0].player.replace(/\s+\(.+?\)$/, '')]);
-      const usedTeams = new Set([safeGoblins[0]._teamId]);
+      const usedPlayers = new Set([eliteGoblins[0].player.replace(/\s+\(.+?\)$/, '')]);
+      const usedTeams = new Set([eliteGoblins[0]._teamId]);
       
       for (const reg of safeRegulars) {
         const playerKey = reg.player.replace(/\s+\(.+?\)$/, '');
@@ -1725,9 +1710,9 @@ function buildRecommendedSlips(rows) {
       }
     }
     
-    // Strategy 3: "Aggressive Mix" - 3 goblins + 2 regulars
-    if (safeGoblins.length >= 3 && safeRegulars.length >= 2) {
-      const threeGoblins = safeGoblins.slice(0, 3);
+    // Strategy 3: "Aggressive Mix" - 3 elite goblins + 2 regulars
+    if (eliteGoblins.length >= 3 && safeRegulars.length >= 2) {
+      const threeGoblins = eliteGoblins.slice(0, 3);
       const twoRegulars = [];
       const usedPlayers = new Set(threeGoblins.map(p => p.player.replace(/\s+\(.+?\)$/, '')));
       
@@ -1868,6 +1853,30 @@ function buildRecommendedSlips(rows) {
     
     console.log(`   Generated ${slips.length} 2-man parlays`);
     return slips;
+  }
+  
+  // Helper function to filter goblins to only those from elite starters
+  function filterEliteGoblins(goblins) {
+    const eliteStarters = loadEliteStarters();
+    const eliteNames = new Set(
+      eliteStarters.map(p => p.player.toLowerCase().trim())
+    );
+    
+    return goblins.filter(goblin => {
+      // Extract player name from the display string
+      const playerMatch = goblin.player.match(/\[(?:Over|Under)\]\s+(.+?)\s+-\s+/);
+      if (!playerMatch) return false;
+      
+      const playerName = playerMatch[1].toLowerCase().trim();
+      
+      // Check if this player is in elite list (fuzzy match for partial names)
+      for (const eliteName of eliteNames) {
+        if (playerName.includes(eliteName) || eliteName.includes(playerName)) {
+          return true;
+        }
+      }
+      return false;
+    });
   }
   
   // Load elite starters list
