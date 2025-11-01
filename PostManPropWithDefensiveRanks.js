@@ -1293,41 +1293,9 @@ function buildRecommendedSlips(rows) {
     const twoManParlays = build2ManParlays(safeRegulars);
     slips.push(...twoManParlays);
   
-    // 10. ALL ELITE GOBLINS SLIP: All safe elite starter goblins in one slip (moved to end)
-    const eliteGoblinsForSlip = filterEliteGoblins(safeGoblins);
-    if (eliteGoblinsForSlip.length > 0) {
-      const pEsts = eliteGoblinsForSlip.map(estPEstForRow).filter(Number.isFinite);
-      const pWin = pEsts.length === eliteGoblinsForSlip.length ? product(pEsts) : null;
-      const totalGap = eliteGoblinsForSlip.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
-      const avgEdge = (totalGap / eliteGoblinsForSlip.length).toFixed(1);
-      const { rating, ratingClass } = calculateSlipRating(eliteGoblinsForSlip);
-      const { riskLevel, riskClass } = getRiskLevel(eliteGoblinsForSlip);
-      
-      const avgOdds = calculateAvgOdds(eliteGoblinsForSlip);
-      const parlayOdds = calculateParlayOdds(eliteGoblinsForSlip);
-      
-      if (DEBUG_MODE) {
-        console.log(`🎃 All Goblins Slip: Filtered ${safeGoblins.length} total goblins to ${eliteGoblinsForSlip.length} elite starter goblins`);
-      }
-      
-      slips.push({
-        title: `🎃 Elite Goblins (${eliteGoblinsForSlip.length}-pick)`,
-        size: eliteGoblinsForSlip.length,
-        bucket: "Goblin",
-        sortBasis: "Edge Gap",
-        pctWin: pWin ? pct(pWin) : "—",
-        legs: eliteGoblinsForSlip.map(leg => formatLegForDisplay(leg)),
-        totalGap,
-        avgEdge,
-        rating,
-        ratingClass,
-        riskLevel,
-        riskClass,
-        avgOdds,
-        parlayOdds,
-        why: "All qualifying elite starter Goblins with positive Edge Gaps that pass strict hit-rate filters."
-      });
-    }
+    // 10. ELITE GOBLINS SLIP: All elite starter goblins sorted by odds
+    const eliteGoblinsSlip = buildEliteGoblinsSlip(safeGoblins);
+    if (eliteGoblinsSlip) slips.push(eliteGoblinsSlip);
   
     // Sort slips: Keep first 3 as-is, then sort rest by rating (DESC) then risk (ASC)
     const anchorSlips = slips.slice(0, 3); // Mega, Elite Stars, Elite Tier
@@ -1591,6 +1559,63 @@ function buildRecommendedSlips(rows) {
       avgOdds,
       parlayOdds,
       why: `All props showing upward momentum (avg +${avgImprovement}% L5 vs L10 improvement).`
+    };
+  }
+  
+  // Build elite goblins slip (all elite starter goblins sorted by odds)
+  function buildEliteGoblinsSlip(safeGoblins) {
+    // Filter to only elite starter goblins
+    const eliteGoblins = filterEliteGoblins(safeGoblins);
+    
+    if (eliteGoblins.length === 0) return null;
+    
+    // Sort by average odds (most negative first = highest implied probability)
+    const sortedEliteGoblins = eliteGoblins.sort((a, b) => {
+      const oddsA = getAllSportsbookOdds(a);
+      const oddsB = getAllSportsbookOdds(b);
+      
+      if (oddsA.length === 0 && oddsB.length === 0) return 0;
+      if (oddsA.length === 0) return 1;
+      if (oddsB.length === 0) return -1;
+      
+      // Calculate average odds for each
+      const avgA = oddsA.reduce((sum, o) => sum + o, 0) / oddsA.length;
+      const avgB = oddsB.reduce((sum, o) => sum + o, 0) / oddsB.length;
+      
+      // Most negative first (e.g., -521 before -120)
+      return avgA - avgB;
+    });
+    
+    const pEsts = sortedEliteGoblins.map(estPEstForRow).filter(Number.isFinite);
+    const pWin = pEsts.length === sortedEliteGoblins.length ? product(pEsts) : null;
+    const totalGap = sortedEliteGoblins.reduce((sum, prop) => sum + (prop.edgeGapPct || 0), 0).toFixed(1);
+    const avgEdge = (totalGap / sortedEliteGoblins.length).toFixed(1);
+    const { rating, ratingClass } = calculateSlipRating(sortedEliteGoblins);
+    const { riskLevel, riskClass } = getRiskLevel(sortedEliteGoblins);
+    
+    const avgOdds = calculateAvgOdds(sortedEliteGoblins);
+    const parlayOdds = calculateParlayOdds(sortedEliteGoblins);
+    
+    if (DEBUG_MODE) {
+      console.log(`🎃 Elite Goblins Slip: Filtered ${safeGoblins.length} total goblins to ${sortedEliteGoblins.length} elite starter goblins`);
+    }
+    
+    return {
+      title: `🎃 Elite Goblins (${sortedEliteGoblins.length}-pick)`,
+      size: sortedEliteGoblins.length,
+      bucket: "Goblin",
+      sortBasis: "Avg Odds",
+      pctWin: pWin ? pct(pWin) : "—",
+      legs: sortedEliteGoblins.map(leg => formatLegForDisplay(leg)),
+      totalGap,
+      avgEdge,
+      rating,
+      ratingClass,
+      riskLevel,
+      riskClass,
+      avgOdds,
+      parlayOdds,
+      why: "All elite starter Goblins sorted by highest negative odds first (strongest favorites/highest implied probability)."
     };
   }
   
@@ -2100,10 +2125,11 @@ function buildRecommendedSlips(rows) {
   }
   
   // Format leg display consistently across all slip types
-  // Helper function to extract all sportsbook odds from a leg
+  // Helper function to extract all sportsbook odds from a leg (excluding PrizePicks)
   function getAllSportsbookOdds(leg) {
     const allOdds = [];
-    const sportsbookFields = ['CAESARS_odds', 'FANDUEL_odds', 'DK_odds', 'PP_odds', 'UD_odds', 'SleeperOdds', 'FLIFF_odds'];
+    // Exclude PP_odds as they're always -119 (regular) or -137 (goblin)
+    const sportsbookFields = ['CAESARS_odds', 'FANDUEL_odds', 'DK_odds', 'UD_odds', 'SleeperOdds', 'FLIFF_odds'];
     
     for (const field of sportsbookFields) {
       if (leg[field]) {
@@ -2114,7 +2140,7 @@ function buildRecommendedSlips(rows) {
       }
     }
     
-    // If no sportsbook odds found, try AVG_ODDS as fallback
+    // If no sportsbook odds found, try AVG_ODDS as fallback (excludes PP)
     if (allOdds.length === 0 && leg.AVG_ODDS) {
       const american = parseInt(String(leg.AVG_ODDS).replace(/[^-\d]/g, '')) || 0;
       if (american !== 0) {
