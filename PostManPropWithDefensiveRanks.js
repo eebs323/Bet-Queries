@@ -1324,7 +1324,22 @@ function buildRecommendedSlips(rows) {
       });
     }
   
-    return slips;
+    // Sort slips: Keep first 3 as-is, then sort rest by rating (DESC) then risk (ASC)
+    const anchorSlips = slips.slice(0, 3); // Mega, Elite Stars, Elite Tier
+    const remainingSlips = slips.slice(3);
+    
+    // Sort remaining slips by rating (highest first), then by risk (LOW before MEDIUM before HIGH)
+    const riskOrder = { 'LOW': 1, 'MEDIUM': 2, 'HIGH': 3 };
+    remainingSlips.sort((a, b) => {
+      // Primary sort: rating descending (higher rating first)
+      if (b.rating !== a.rating) {
+        return b.rating - a.rating;
+      }
+      // Secondary sort: risk ascending (lower risk first)
+      return (riskOrder[a.riskLevel] || 999) - (riskOrder[b.riskLevel] || 999);
+    });
+    
+    return [...anchorSlips, ...remainingSlips];
   }
   
   // Build a tiered slip from a sorted list
@@ -1578,9 +1593,39 @@ function buildRecommendedSlips(rows) {
   function buildGoblinMixSlips(safeGoblins, safeRegulars) {
     if (safeGoblins.length < 2 || safeRegulars.length < 2) return [];
     
+    // Load elite starters and filter goblins to only include elite starter goblins
+    const eliteStarters = loadEliteStarters();
+    const eliteNames = new Set(
+      eliteStarters.map(p => p.player.toLowerCase().trim())
+    );
+    
+    // Filter goblins to only those from elite starters
+    const eliteGoblins = safeGoblins.filter(goblin => {
+      // Extract player name from the display string
+      const playerMatch = goblin.player.match(/\[(?:Over|Under)\]\s+(.+?)\s+-\s+/);
+      if (!playerMatch) return false;
+      
+      const playerName = playerMatch[1].toLowerCase().trim();
+      
+      // Check if this player is in elite list (fuzzy match for partial names)
+      for (const eliteName of eliteNames) {
+        if (playerName.includes(eliteName) || eliteName.includes(playerName)) {
+          return true;
+        }
+      }
+      return false;
+    });
+    
+    if (DEBUG_MODE) {
+      console.log(`🎃 Goblin Mix: Filtered ${safeGoblins.length} total goblins to ${eliteGoblins.length} elite starter goblins`);
+    }
+    
+    // Use elite goblins instead of all safe goblins
+    if (eliteGoblins.length < 1 || safeRegulars.length < 2) return [];
+    
     const slips = [];
     
-    // Strategy 1: "Goblin Boost" - 2 safest goblins + 3 elite regulars
+    // Strategy 1: "Goblin Boost" - 2 safest elite goblins + 3 elite regulars
     if (safeGoblins.length >= 2 && safeRegulars.length >= 3) {
       const topGoblins = safeGoblins.slice(0, 2); // Already sorted by safety
       const topRegulars = safeRegulars.slice(0, 5);
